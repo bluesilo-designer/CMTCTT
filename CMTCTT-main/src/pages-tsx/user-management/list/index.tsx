@@ -1,0 +1,295 @@
+import { useState, useRef, useEffect, useMemo } from "react";
+import { Search, Trash2, SlidersHorizontal } from "lucide-react";
+import { InputCustom } from "@/components/input";
+import { Button } from "@/components/button";
+import { users } from "@/data/userManagement";
+import type { UserRoleType } from "@/data/userManagement";
+import { cn } from "@/lib/utils";
+import { tabs, ROLES, PER_PAGE } from "./constants";
+import type { TabType, UserListProps } from "./types";
+import { UserTable } from "./components/UserTable";
+import { FilterPanel } from "./components/FilterPanel";
+import { AddUserDrawer } from "./modals/AddUserDrawer";
+
+export function UserList({ onNavigate }: UserListProps) {
+  const [activeTab, setActiveTab] = useState<TabType>("Overall");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [filterStatus, setFilterStatus] = useState<string>("");
+  const [filterRanks, setFilterRanks] = useState<Set<string>>(new Set());
+  const [filterUnits, setFilterUnits] = useState<Set<string>>(new Set());
+  const [filterOpen, setFilterOpen] = useState(false);
+  const filterRef = useRef<HTMLDivElement>(null);
+
+  const uniqueRanks = useMemo(() => [...new Set(users.map((u) => u.rank))].sort(), []);
+  const uniqueUnits = useMemo(() => [...new Set(users.map((u) => u.unitName))].sort(), []);
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (filterRef.current && !filterRef.current.contains(e.target as Node)) {
+        setFilterOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const toggleRank = (r: string) =>
+    setFilterRanks((prev) => {
+      const n = new Set(prev);
+      n.has(r) ? n.delete(r) : n.add(r);
+      return n;
+    });
+
+  const toggleUnit = (u: string) =>
+    setFilterUnits((prev) => {
+      const n = new Set(prev);
+      n.has(u) ? n.delete(u) : n.add(u);
+      return n;
+    });
+
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    counts["Overall"] = users.filter((u) => u.accountStatus !== "Archived").length;
+    counts["Archived"] = users.filter((u) => u.accountStatus === "Archived").length;
+    for (const role of ROLES) {
+      counts[role] = users.filter((u) => u.userRole === role).length;
+    }
+    return counts;
+  }, []);
+
+  const filtered = users.filter((u) => {
+    const matchesTab =
+      activeTab === "Overall"
+        ? u.accountStatus !== "Archived"
+        : activeTab === "Archived"
+        ? u.accountStatus === "Archived"
+        : u.userRole === (activeTab as UserRoleType);
+    const matchesSearch =
+      !searchQuery ||
+      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.userId.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = !filterStatus || u.accountStatus === filterStatus;
+    const matchesRank = filterRanks.size === 0 || filterRanks.has(u.rank);
+    const matchesUnit = filterUnits.size === 0 || filterUnits.has(u.unitName);
+    return matchesTab && matchesSearch && matchesStatus && matchesRank && matchesUnit;
+  });
+
+  const activeFilterCount =
+    (filterStatus ? 1 : 0) + filterRanks.size + filterUnits.size;
+  const hasActiveFilters = activeFilterCount > 0;
+  const clearAllFilters = () => {
+    setFilterStatus("");
+    setFilterRanks(new Set());
+    setFilterUnits(new Set());
+  };
+
+  const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const allSelected =
+    paginated.length > 0 && paginated.every((u) => selected.has(u.id));
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(paginated.map((u) => u.id)));
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  };
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="px-6 py-6">
+        {/* Page header */}
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl font-semibold text-brand-primary">
+            User List{" "}
+            <span className="text-gray-400 font-normal text-base ml-1">
+              ({filtered.length} Users)
+            </span>
+          </h1>
+          <div className="flex items-center gap-3">
+            {selected.size > 0 && (
+              <Button
+                onClick={() => setSelected(new Set())}
+                className="flex items-center gap-2 px-4 py-2.5 text-sm bg-red-600 hover:bg-red-700 text-white rounded-lg font-semibold shadow-sm transition-colors"
+              >
+                <Trash2 size={15} />
+                Delete ({selected.size})
+              </Button>
+            )}
+            <Button
+              onClick={() => setDrawerOpen(true)}
+              className="px-4 py-2.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover font-semibold shadow-sm transition-colors"
+            >
+              + Add User
+            </Button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200">
+          {/* Tabs + Search */}
+          <div className="flex items-center justify-between px-5 border-b border-gray-200">
+            {/* Tab buttons — kept as raw buttons per IMT rules (tab selectors) */}
+            <div className="flex">
+              {tabs.map((tab) => {
+                const count = tabCounts[tab] ?? 0;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => handleTabChange(tab)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-4 py-3.5 text-sm font-medium transition-colors relative whitespace-nowrap",
+                      activeTab === tab
+                        ? "text-brand-primary"
+                        : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    {tab}
+                    {count > 0 && (
+                      <span
+                        className={cn(
+                          "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold",
+                          activeTab === tab
+                            ? "bg-brand-primary text-white"
+                            : "bg-gray-100 text-gray-500"
+                        )}
+                      >
+                        {count}
+                      </span>
+                    )}
+                    {activeTab === tab && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search + Filter */}
+            <div className="flex items-center gap-2 py-2">
+              <div className="relative">
+                <Search
+                  size={14}
+                  className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400"
+                />
+                <InputCustom
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => {
+                    setSearchQuery(e.target.value);
+                    setCurrentPage(1);
+                  }}
+                  className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md w-48 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+                />
+              </div>
+
+              {/* Filter button — kept as raw button (toggle widget) */}
+              <div ref={filterRef} className="relative">
+                <button
+                  onClick={() => setFilterOpen((v) => !v)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-3 py-1.5 text-sm border rounded-lg transition-colors",
+                    filterOpen
+                      ? "border-brand-primary text-brand-primary bg-brand-primary/5"
+                      : "border-gray-200 text-gray-600 hover:border-brand-primary hover:text-brand-primary"
+                  )}
+                >
+                  <SlidersHorizontal size={14} />
+                  Filters
+                  {activeFilterCount > 0 && (
+                    <span className="ml-0.5 inline-flex items-center justify-center w-4 h-4 rounded-full bg-brand-primary text-white text-[10px] font-bold">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                {filterOpen && (
+                  <FilterPanel
+                    filterStatus={filterStatus}
+                    filterRanks={filterRanks}
+                    filterUnits={filterUnits}
+                    uniqueRanks={uniqueRanks}
+                    uniqueUnits={uniqueUnits}
+                    hasActiveFilters={hasActiveFilters}
+                    onSetFilterStatus={setFilterStatus}
+                    onToggleRank={toggleRank}
+                    onToggleUnit={toggleUnit}
+                    onClearAll={clearAllFilters}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Active filter chips */}
+          {hasActiveFilters && (
+            <div className="flex flex-wrap items-center gap-2 px-5 py-2.5 border-b border-gray-100 bg-gray-50/50">
+              {filterStatus && (
+                <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-medium border border-brand-primary/20">
+                  Status: {filterStatus}
+                  <button
+                    onClick={() => setFilterStatus("")}
+                    className="hover:text-brand-primary-hover ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              )}
+              {[...filterRanks].map((r) => (
+                <span
+                  key={r}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-medium border border-brand-primary/20"
+                >
+                  Rank: {r}
+                  <button
+                    onClick={() => toggleRank(r)}
+                    className="hover:text-brand-primary-hover ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+              {[...filterUnits].map((u) => (
+                <span
+                  key={u}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-brand-primary/10 text-brand-primary text-xs font-medium border border-brand-primary/20"
+                >
+                  Unit: {u}
+                  <button
+                    onClick={() => toggleUnit(u)}
+                    className="hover:text-brand-primary-hover ml-0.5"
+                  >
+                    ×
+                  </button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          {/* Table */}
+          <UserTable
+            paginated={paginated}
+            currentPage={currentPage}
+            totalItems={filtered.length}
+            selected={selected}
+            allSelected={allSelected}
+            onToggleAll={toggleAll}
+            onToggleOne={toggleOne}
+            onPageChange={setCurrentPage}
+            onNavigate={onNavigate}
+          />
+        </div>
+      </div>
+
+      <AddUserDrawer open={drawerOpen} onClose={() => setDrawerOpen(false)} />
+    </div>
+  );
+}

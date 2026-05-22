@@ -1,0 +1,677 @@
+import { useState, useMemo } from "react";
+import { StatusBadge } from "@/components/ui/StatusBadge";
+import { Pagination } from "@/components/ui/Pagination";
+import { bookings } from "@/data/mock";
+import type { BookingStatus } from "@/data/mock";
+import {
+  Search,
+  List,
+  Calendar,
+  SlidersHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ArrowUpDown,
+  Eye,
+  Clock,
+  CheckCircle2,
+  MoreVertical,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+
+type TabType =
+  | "Overall"
+  | "Upcoming"
+  | "Ongoing"
+  | "Return Assets"
+  | "Completed"
+  | "Cancelled"
+  | "Overdue";
+
+type CalendarMode = "Month" | "Weekly" | "Daily";
+
+const tabs: TabType[] = [
+  "Overall",
+  "Upcoming",
+  "Ongoing",
+  "Return Assets",
+  "Completed",
+  "Cancelled",
+  "Overdue",
+];
+
+const MONTH_NAMES = [
+  "January","February","March","April","May","June",
+  "July","August","September","October","November","December",
+];
+const DAY_ABBREVS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const PER_PAGE = 10;
+const TODAY = new Date(2026, 3, 23);
+
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function bookingDateKeys(dateStr: string): string[] {
+  const MONTH_MAP: Record<string, number> = {
+    Jan:1,Feb:2,Mar:3,Apr:4,May:5,Jun:6,Jul:7,Aug:8,Sep:9,Oct:10,Nov:11,Dec:12,
+  };
+  const ymMatch = dateStr.match(/([A-Za-z]{3})\s+(\d{4})/);
+  if (!ymMatch) return [];
+  const month = MONTH_MAP[ymMatch[1]];
+  const year = parseInt(ymMatch[2]);
+  const days = [...dateStr.matchAll(/\b(\d{1,2})\b/g)]
+    .map((m) => parseInt(m[1]))
+    .filter((d) => d >= 1 && d <= 31);
+  return days.map(
+    (d) => `${year}-${String(month).padStart(2, "0")}-${String(d).padStart(2, "0")}`
+  );
+}
+
+function parseBookingTime(raw: string): { date: string; timeRange: string; label: string } {
+  const lines = raw.split("\n");
+  const dateLine = lines[0]?.trim() ?? "";
+  const rest = lines[1]?.trim() ?? lines[0]?.trim() ?? "";
+  // extract time range: e.g. "8:00 AM - 9:00 AM"
+  const timeMatch = rest.match(/(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/);
+  const timeRange = timeMatch ? `${timeMatch[1]} – ${timeMatch[2]}` : "";
+  // extract schedule label
+  const labelMatch = rest.match(/\(([^)]+Schedule|[^)]+Session)\)/);
+  const label = labelMatch ? labelMatch[1] : "";
+  return { date: dateLine, timeRange, label };
+}
+
+function extractTime(bookingTime: string): string {
+  const m = bookingTime.match(
+    /(\d{1,2}:\d{2}\s*(?:AM|PM))\s*-\s*(\d{1,2}:\d{2}\s*(?:AM|PM))/
+  );
+  return m ? `${m[1]} - ${m[2]}` : "";
+}
+
+function getCalendarWeeks(year: number, month: number): Date[][] {
+  const firstDay = new Date(year, month, 1);
+  const startDow = firstDay.getDay();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const lastDay = new Date(year, month, daysInMonth);
+  const endDow = lastDay.getDay();
+  const totalCells = startDow + daysInMonth + (6 - endDow);
+  const numWeeks = Math.ceil(totalCells / 7);
+  const weeks: Date[][] = [];
+  const cur = new Date(year, month, 1 - startDow);
+  for (let w = 0; w < numWeeks; w++) {
+    const week: Date[] = [];
+    for (let d = 0; d < 7; d++) {
+      week.push(new Date(cur));
+      cur.setDate(cur.getDate() + 1);
+    }
+    weeks.push(week);
+  }
+  return weeks;
+}
+
+
+function CalendarEventCard({ booking }: { booking: (typeof bookings)[number] }) {
+  const time = extractTime(booking.bookingTime);
+  return (
+    <div className="border-l-2 border-brand-primary bg-red-50 rounded px-1.5 py-1 mb-1 cursor-pointer hover:bg-red-100 transition-colors">
+      {time && (
+        <div className="text-[10px] text-gray-400 leading-tight font-medium">{time}</div>
+      )}
+      <div className="text-[11px] text-gray-700 font-semibold leading-tight truncate mt-0.5">
+        {booking.unitName}
+      </div>
+      <div className="text-[10px] text-gray-400 truncate">{booking.bookingId}</div>
+    </div>
+  );
+}
+
+function DailyView({ date, bookingByDate, onBack }: { date: Date; bookingByDate: Record<string, any[]>; onBack: () => void }) {
+  const hours = Array.from({ length: 10 }, (_, i) => i + 8);
+  const key = dateKey(date);
+  const dayBookings = bookingByDate[key] || [];
+  const dayName = DAY_ABBREVS[date.getDay()];
+  const monthName = MONTH_NAMES[date.getMonth()];
+
+  return (
+    <div className="flex flex-col h-full">
+      <div className="flex items-center gap-4 px-5 py-4 border-b border-gray-200 bg-white">
+        <button onClick={onBack} className="p-1.5 rounded-md hover:bg-gray-100 transition-colors">
+          <ChevronLeft size={18} className="text-gray-600" />
+        </button>
+        <div>
+          <h2 className="text-base font-semibold text-brand-primary">
+            {dayName}, {monthName} {date.getDate()}, {date.getFullYear()}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">{dayBookings.length} booking{dayBookings.length !== 1 ? "s" : ""} scheduled</p>
+        </div>
+      </div>
+      <div className="flex-1 overflow-auto">
+        <div className="min-w-[600px]">
+          {hours.map((hour) => {
+            const hourBookings = dayBookings.filter((b) => {
+              const timeMatch = b.bookingTime.match(/(\d{1,2}):(\d{2})\s*(AM|PM)/);
+              if (!timeMatch) return false;
+              let h = parseInt(timeMatch[1]);
+              const period = timeMatch[3];
+              if (period === "PM" && h !== 12) h += 12;
+              if (period === "AM" && h === 12) h = 0;
+              return h === hour;
+            });
+            return (
+              <div key={hour} className={cn("flex border-b border-gray-100", hourBookings.length > 0 && "bg-orange-50/30")}>
+                <div className="w-20 flex-shrink-0 py-4 px-3 border-r border-gray-100 text-right">
+                  <span className="text-xs font-semibold text-gray-400">
+                    {hour % 12 === 0 ? 12 : hour % 12} {hour < 12 ? "AM" : "PM"}
+                  </span>
+                </div>
+                <div className="flex-1 py-2 px-3 min-h-[80px]">
+                  {hourBookings.map((b) => (
+                    <div key={b.id} className="bg-white border border-orange-200 border-l-4 border-l-brand-primary rounded-md px-3 py-2.5 mb-2 shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+                      <div className="text-sm font-semibold text-gray-800">{b.program}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{extractTime(b.bookingTime)}</div>
+                      <div className="flex items-center gap-2 mt-1">
+                        <span className="text-xs text-gray-400">{b.bookingId}</span>
+                        <StatusBadge status={b.status} size="sm" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Booking row 3-dot menu ────────────────────────────────────────────────────
+function BookingRowMenu({ onView }: { onView: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative" onClick={(e) => e.stopPropagation()}>
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
+        title="More actions"
+      >
+        <MoreVertical size={14} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-40 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1 overflow-hidden">
+            <button
+              onClick={() => { setOpen(false); onView(); }}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              View Details
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+            >
+              Edit Booking
+            </button>
+            <button
+              onClick={() => setOpen(false)}
+              className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50 transition-colors"
+            >
+              Cancel Booking
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Courseware tooltip cell ───────────────────────────────────────────────────
+function CoursewareCell({ text }: { text: string }) {
+  const isLong = text.length > 20;
+  return (
+    <div className="relative group/tip max-w-[170px]">
+      <div className="truncate text-sm text-gray-600">{text}</div>
+      {isLong && (
+        <div className="pointer-events-none absolute bottom-full left-0 mb-1.5 z-50 hidden group-hover/tip:block">
+          <div className="bg-gray-800 text-white text-xs rounded-lg px-3 py-2 max-w-[260px] whitespace-normal shadow-lg leading-snug">
+            {text}
+          </div>
+          <div className="w-2 h-2 bg-gray-800 rotate-45 ml-3 -mt-1" />
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function BookingList({ onNavigate, createPath = "/bookings/create" }: { onNavigate?: (path: string) => void; createPath?: string }) {
+  const [activeTab, setActiveTab] = useState<TabType>("Overall");
+  const [viewMode, setViewMode] = useState<"list" | "calendar">("list");
+  const [calMode, setCalMode] = useState<CalendarMode>("Month");
+  const [calYear, setCalYear] = useState(2026);
+  const [calMonth, setCalMonth] = useState(3);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+
+  // Tab counts
+  const tabCounts = useMemo(() => {
+    const counts: Record<string, number> = { Overall: bookings.length };
+    for (const b of bookings) {
+      counts[b.status] = (counts[b.status] ?? 0) + 1;
+    }
+    return counts;
+  }, []);
+
+  // Filtered + sorted list
+  const filtered = useMemo(() => {
+    let result = bookings.filter((b) => {
+      const matchesTab = activeTab === "Overall" || b.status === (activeTab as BookingStatus);
+      const matchesSearch =
+        !searchQuery ||
+        b.program.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        b.bookingId.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        b.unitName.toLowerCase().includes(searchQuery.toLowerCase());
+      return matchesTab && matchesSearch;
+    });
+    result = [...result].sort((a, b) => {
+      const da = a.bookingDate;
+      const db = b.bookingDate;
+      return sortDir === "asc" ? da.localeCompare(db) : db.localeCompare(da);
+    });
+    return result;
+  }, [activeTab, searchQuery, sortDir]);
+
+  const totalPages = Math.ceil(filtered.length / PER_PAGE);
+  const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const handleTabChange = (tab: TabType) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  };
+
+  // Calendar
+  const calWeeks = useMemo(() => getCalendarWeeks(calYear, calMonth), [calYear, calMonth]);
+  const bookingByDate = useMemo(() => {
+    const map: Record<string, (typeof bookings)> = {};
+    for (const b of bookings) {
+      for (const k of bookingDateKeys(b.bookingDate)) {
+        if (!map[k]) map[k] = [];
+        map[k].push(b);
+      }
+    }
+    return map;
+  }, []);
+
+  const navPrev = () => {
+    if (calMonth === 0) { setCalMonth(11); setCalYear(y => y - 1); }
+    else setCalMonth(m => m - 1);
+  };
+  const navNext = () => {
+    if (calMonth === 11) { setCalMonth(0); setCalYear(y => y + 1); }
+    else setCalMonth(m => m + 1);
+  };
+  const goToday = () => { setCalYear(2026); setCalMonth(3); };
+  const todayKey = dateKey(TODAY);
+
+  const ViewToggle = ({ className }: { className?: string }) => (
+    <div className={cn("flex gap-1", className)}>
+      <button
+        onClick={() => setViewMode("list")}
+        title="List View"
+        className={cn(
+          "flex items-center justify-center w-8 h-8 rounded-md border text-sm transition-colors",
+          viewMode === "list"
+            ? "border-brand-primary bg-brand-primary text-white"
+            : "border-gray-200 text-gray-500 hover:bg-gray-50"
+        )}
+      >
+        <List size={15} />
+      </button>
+      <button
+        onClick={() => setViewMode("calendar")}
+        title="Calendar View"
+        className={cn(
+          "flex items-center justify-center w-8 h-8 rounded-md border text-sm transition-colors",
+          viewMode === "calendar"
+            ? "border-brand-primary bg-brand-primary text-white"
+            : "border-gray-200 text-gray-500 hover:bg-gray-50"
+        )}
+      >
+        <Calendar size={15} />
+      </button>
+    </div>
+  );
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-6 space-y-4">
+        {/* Page header */}
+        <div className="flex items-center justify-between">
+          <h1 className="text-xl font-semibold text-brand-primary">Booking List</h1>
+          <button
+            onClick={() => onNavigate?.(createPath)}
+            className="px-4 py-2 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover font-semibold shadow-sm transition-colors"
+          >
+            + Create Booking
+          </button>
+        </div>
+
+        {/* Main card */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+
+          {/* ---- CALENDAR VIEW ---- */}
+          {viewMode === "calendar" && (
+            <>
+              {calMode === "Daily" && selectedDate ? (
+                <DailyView
+                  date={selectedDate}
+                  bookingByDate={bookingByDate}
+                  onBack={() => { setSelectedDate(null); setCalMode("Month"); }}
+                />
+              ) : (
+                <>
+                  <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 gap-3">
+                    {/* Mode selector */}
+                    <div className="flex items-center gap-2">
+                      <div className="flex bg-gray-100 rounded-lg p-0.5">
+                        {(["Month", "Weekly", "Daily"] as CalendarMode[]).map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => setCalMode(m)}
+                            className={cn(
+                              "px-3 py-1.5 text-xs font-semibold rounded-md transition-colors",
+                              calMode === m
+                                ? "bg-white text-brand-primary shadow-sm"
+                                : "text-gray-500 hover:text-gray-700"
+                            )}
+                          >
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        onClick={goToday}
+                        className="px-3 py-1.5 text-xs font-semibold border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+                      >
+                        Today
+                      </button>
+                    </div>
+
+                    {/* Month navigator */}
+                    <div className="flex items-center gap-1">
+                      <button onClick={navPrev} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                        <ChevronLeft size={16} className="text-gray-600" />
+                      </button>
+                      <span className="text-sm font-bold text-gray-800 min-w-[120px] text-center">
+                        {MONTH_NAMES[calMonth]} {calYear}
+                      </span>
+                      <button onClick={navNext} className="p-1.5 rounded-lg hover:bg-gray-100 transition-colors">
+                        <ChevronRight size={16} className="text-gray-600" />
+                      </button>
+                    </div>
+
+                    <ViewToggle />
+                  </div>
+
+                  {/* Day headers */}
+                  <div className="grid grid-cols-7 bg-gray-50 border-b border-gray-100">
+                    {DAY_ABBREVS.map((d) => (
+                      <div key={d} className="py-2.5 text-center text-xs font-bold text-gray-400 tracking-wide uppercase border-r border-gray-100 last:border-r-0">
+                        {d}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Calendar grid */}
+                  {calWeeks.map((week, wi) => (
+                    <div key={wi} className="grid grid-cols-7 border-b border-gray-100 last:border-b-0" style={{ minHeight: "110px" }}>
+                      {week.map((day, di) => {
+                        const key = dateKey(day);
+                        const isCurrentMonth = day.getMonth() === calMonth;
+                        const isToday = key === todayKey;
+                        const dayBookings = bookingByDate[key] || [];
+
+                        return (
+                          <div
+                            key={di}
+                            onClick={() => { setSelectedDate(day); setCalMode("Daily"); }}
+                            className={cn(
+                              "border-r border-gray-100 last:border-r-0 p-2 cursor-pointer transition-colors",
+                              !isCurrentMonth ? "bg-gray-50/70" : "hover:bg-gray-50",
+                              isToday && "bg-blue-50/40"
+                            )}
+                          >
+                            <div className="flex justify-end mb-1.5">
+                              <span className={cn(
+                                "w-6 h-6 flex items-center justify-center text-xs font-semibold rounded-full",
+                                isToday ? "bg-brand-primary text-white" : isCurrentMonth ? "text-gray-700" : "text-gray-300"
+                              )}>
+                                {day.getDate()}
+                              </span>
+                            </div>
+                            {dayBookings.slice(0, 2).map((b) => (
+                              <CalendarEventCard key={b.id} booking={b} />
+                            ))}
+                            {dayBookings.length > 2 && (
+                              <div className="text-[10px] text-brand-primary font-semibold px-1 mt-0.5">
+                                +{dayBookings.length - 2} more
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ))}
+                </>
+              )}
+            </>
+          )}
+
+          {/* ---- LIST VIEW ---- */}
+          {viewMode === "list" && (
+            <>
+              {/* Tabs row */}
+              <div className="flex items-center justify-between px-5 border-b border-gray-100">
+                <div className="flex overflow-x-auto">
+                  {tabs.map((tab) => {
+                    const count = tabCounts[tab] ?? 0;
+                    return (
+                      <button
+                        key={tab}
+                        onClick={() => handleTabChange(tab)}
+                        className={cn(
+                          "flex items-center gap-1.5 px-4 py-3 text-sm font-medium transition-colors whitespace-nowrap relative",
+                          activeTab === tab
+                            ? "text-brand-primary"
+                            : "text-gray-500 hover:text-gray-700"
+                        )}
+                      >
+                        {tab}
+                        {count > 0 && (
+                          <span className={cn(
+                            "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold",
+                            activeTab === tab
+                              ? "bg-brand-primary text-white"
+                              : "bg-gray-100 text-gray-500"
+                          )}>
+                            {count}
+                          </span>
+                        )}
+                        {activeTab === tab && (
+                          <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-t-full" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <ViewToggle className="flex-shrink-0 ml-2" />
+              </div>
+
+              {/* Search/filter bar */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100 bg-gray-50/50">
+                <span className="text-sm font-semibold text-gray-700">
+                  {activeTab} Bookings
+                  <span className="ml-2 text-xs font-normal text-gray-400">({filtered.length} records)</span>
+                </span>
+                <div className="flex items-center gap-2">
+                  <div className="relative">
+                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <input
+                      type="text"
+                      placeholder="Search bookings…"
+                      value={searchQuery}
+                      onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                      className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-52 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary transition-all"
+                    />
+                  </div>
+                  <button title="Date Filter" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-white hover:shadow-sm transition-all">
+                    <Calendar size={13} />
+                    <span className="text-xs font-medium">Date</span>
+                  </button>
+                  <button title="Filters" className="flex items-center gap-1.5 px-3 py-1.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-white hover:shadow-sm transition-all">
+                    <SlidersHorizontal size={13} />
+                    <span className="text-xs font-medium">Filters</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] border-collapse">
+                  <thead>
+                    <tr className="bg-red-50/70">
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary w-10">#</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[260px]">Booking</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[90px]">Type</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[190px]">
+                        <button
+                          onClick={() => setSortDir(d => d === "asc" ? "desc" : "asc")}
+                          className="flex items-center gap-1 hover:text-brand-primary-hover transition-colors"
+                        >
+                          Booking Time
+                          <ArrowUpDown size={11} className="text-gray-400" />
+                        </button>
+                      </th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[110px]">Status</th>
+                      {activeTab !== "Completed" && (
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[100px]">Assets</th>
+                      )}
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[120px]">Mode</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[170px]">Courseware</th>
+                      <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary min-w-[110px]">Unit</th>
+                      <th className="w-12 px-5 py-3"></th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-50">
+                    {paginated.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="text-center py-16 text-gray-400">
+                          <Search size={32} className="mx-auto mb-3 text-gray-200" />
+                          <p className="text-sm font-medium">No bookings found</p>
+                          <p className="text-xs mt-1">Try adjusting your search or filters</p>
+                        </td>
+                      </tr>
+                    ) : (
+                      paginated.map((booking, idx) => {
+                        const { date, timeRange, label } = parseBookingTime(booking.bookingTime);
+                        return (
+                          <tr
+                            key={booking.id}
+                            onClick={() => onNavigate?.(`/bookings/detail?id=${booking.id}`)}
+                            className="group hover:bg-gray-50/80 cursor-pointer transition-colors"
+                          >
+                            <td className="px-5 py-3.5 text-sm text-gray-500 font-medium">
+                              {(currentPage - 1) * PER_PAGE + idx + 1}
+                            </td>
+
+                            <td className="px-5 py-3.5">
+                              <div className="font-semibold text-sm text-gray-800 group-hover:text-brand-primary transition-colors leading-snug">
+                                {booking.program}
+                              </div>
+                              <div className="text-xs text-gray-400 mt-0.5 font-mono">{booking.bookingId}</div>
+                            </td>
+
+                            <td className="px-5 py-3.5">
+                              <span className={cn(
+                                "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold",
+                                booking.trainingType === "Group"
+                                  ? "bg-blue-50 text-blue-600"
+                                  : "bg-purple-50 text-purple-600"
+                              )}>
+                                {booking.trainingType}
+                              </span>
+                            </td>
+
+                            <td className="px-5 py-3.5">
+                              <div className="text-sm font-semibold text-gray-700">{date}</div>
+                              {timeRange && (
+                                <div className="text-xs text-gray-500 mt-0.5">{timeRange}</div>
+                              )}
+                              {label && (
+                                <div className="text-[10px] text-gray-400 mt-0.5 italic">{label}</div>
+                              )}
+                            </td>
+
+                            <td className="px-5 py-3.5">
+                              <StatusBadge status={booking.status} />
+                            </td>
+
+                            {activeTab !== "Completed" && (
+                              <td className="px-5 py-3.5">
+                                {booking.assetIssued ? (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-green-50 text-green-600 border border-green-100">
+                                    <CheckCircle2 size={10} /> Issued
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100">
+                                    <Clock size={10} /> Pending
+                                  </span>
+                                )}
+                              </td>
+                            )}
+
+                            <td className="px-5 py-3.5 text-sm text-gray-600">{booking.trainingMode}</td>
+
+                            <td className="px-5 py-3.5 max-w-[170px]">
+                              <CoursewareCell text={booking.courseware} />
+                            </td>
+
+                            <td className="px-5 py-3.5 text-sm text-gray-600">{booking.unitName}</td>
+
+                            <td className="px-5 py-3.5 text-right">
+                              <div className="flex items-center justify-end gap-0.5">
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); onNavigate?.(`/bookings/detail?id=${booking.id}`); }}
+                                  className="p-1.5 rounded-md hover:bg-gray-100 text-gray-400 hover:text-brand-primary transition-colors"
+                                  title="View Details"
+                                >
+                                  <Eye size={14} />
+                                </button>
+                                {(booking.status === "Upcoming" || booking.status === "Ongoing" || booking.status === "Return Assets") && (
+                                  <BookingRowMenu onView={() => onNavigate?.(`/bookings/detail?id=${booking.id}`)} />
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <Pagination
+                current={currentPage}
+                total={totalPages || 1}
+                perPage={PER_PAGE}
+                totalItems={filtered.length}
+                onPageChange={setCurrentPage}
+              />
+            </>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}

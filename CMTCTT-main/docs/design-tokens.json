@@ -1,0 +1,223 @@
+{
+  "$metadata": {
+    "tokenSetOrder": ["brand", "primitive", "semantic"]
+  },
+
+  "brand": {
+    "$description": "Raw brand identity values. Single source of truth for TRMS brand colors.",
+    "color": {
+      "primary":       { "value": "#7A1515", "type": "color", "description": "Main brand red" },
+      "primary-hover": { "value": "#8B1A1A", "type": "color", "description": "Brand red — hover / pressed" },
+      "navy":          { "value": "#1A3A6B", "type": "color", "description": "Navy blue — logo, sidebar" },
+      "bluesilo":      { "value": "#0047AB", "type": "color", "description": "Blue Silo corporate color" }
+    }
+  },
+
+  "primitive": {
+    "$description": "Full named color scales. Used only inside Semantic tokens — do not use directly in components.",
+    "color": {
+      "white": { "value": "#FFFFFF", "type": "color" },
+      "black": { "value": "#000000", "type": "color" },
+
+      "red": {
+        "50":  { "value": "#FEF2F2", "type": "color" },
+        "100": { "value": "#FEE2E2", "type": "color" },
+        "200": { "value": "#FECACA", "type": "color" },
+        "300": { "value": "#FCA5A5", "type": "color" },
+        "400": { "value": "#F87171", "type": "color" },
+        "500": { "value": "#EF4444", "type": "color" },
+        "600": { "value": "#DC2626", "type": "color" },
+        "700": { "value": "#B91C1C", "type": "color" },
+        "800": { "value": "#8B1A1A", "type": "color" },
+        "900": { "value": "#7A1515", "type": "color" },
+        "950": { "value": "#450A0A", "type": "color" }
+      },
+
+      "gray": {
+        "50":  { "value": "#F9FAFB", "type": "color" },
+        "100": { "value": "#F3F4F6", "type": "color" },
+        "200": { "value": "#E5E7EB", "type": "color" },
+        "300": { "value": "#D1D5DB", "type": "color" },
+        "400": { "value": "#9CA3AF", "type": "color" },
+        "500": { "value": "#6B7280", "type": "color" },
+        "600": { "value": "#4B5563", "type": "color" },
+        "700": { "value": "#374151", "type": "color" },
+        "800": { "value": "#1F2937", "type": "color" },
+        "900": { "value": "#111827", "type": "color" },
+        "950": { "value": "#030712", "type": "color" }
+      },
+
+      "green": {
+        "50":  { "value": "#F0FDF4", "type": "color" },
+        "100": { "value": "#DCFCE7", "type": "color" },
+        "200": { "value": "#BBF7D0", "type": "color" },
+        "300": { "value": "#86EFAC", "type": "color" },
+        "400": { "value": "#4ADE80", "type": "color" },
+        "500": { "value": "#22C55E", "type": "color" },
+        "600": { "value": "#16A34A", "type": "color" },
+        "700": { "value": "#15803D", "type": "color" },
+        "800": { "value": "#166534", "type": "color" },
+        "900": { "value": "#14532D", "type": "color" }
+      },
+
+      "yellow": {
+        "50":  { "value": "#FFFBEB", "type": "color" },
+        "100": { "value": "#FEF3C7", "type": "color" },
+        "200": { "value": "#FDE68A", "type": "color" },
+        "300": { "value": "#FCD34D", "type": "color" },
+        "400": { "value": "#FBBF24", "type": "color" },
+        "500": { "value": "#F59E0B", "type": "color" },
+        "600": { "value": "#D97706", "type": "color" },
+        "700": { "value": "#B45309", "type": "color" },
+        "800": { "value": "#92400E", "type": "color" },
+        "900": { "value": "#78350F", "type": "color" }
+      },
+
+      "blue": {
+        "50":  { "value": "#EFF6FF", "type": "color" },
+        "100": { "value": "#DBEAFE", "type": "color" },
+        "200": { "value": "#BFDBFE", "type": "color" },
+        "300": { "value": "#93C5FD", "type": "color" },
+        "400": { "value": "#60A5FA", "type": "color" },
+        "500": { "value": "#3B82F6", "type": "color" },
+        "600": { "value": "#2563EB", "type": "color" },
+        "700": { "value": "#1D4ED8", "type": "color" },
+        "800": { "value": "#1E40AF", "type": "color" },
+        "900": { "value": "#1E3A8A", "type": "color" }
+      },
+
+      "purple": {
+        "50":  { "value": "#FAF5FF", "type": "color" },
+        "100": { "value": "#F3E8FF", "type": "color" },
+        "200": { "value": "#E9D5FF", "type": "color" },
+        "400": { "value": "#C084FC", "type": "color" },
+        "500": { "value": "#A855F7", "type": "color" },
+        "600": { "value": "#9333EA", "type": "color" },
+        "700": { "value": "#7C3AED", "type": "color" },
+        "900": { "value": "#4C1D95", "type": "color" }
+      }
+    }
+  },
+
+  "semantic": {
+    "$description": "Purpose-named tokens mapped to Tailwind utility classes. Always references Primitive or Brand — never raw hex values.",
+
+    "color": {
+      "brand": {
+        "primary":       { "value": "{brand.color.primary}",       "type": "color", "description": "→ bg-brand-primary / text-brand-primary" },
+        "primary-hover": { "value": "{brand.color.primary-hover}", "type": "color", "description": "→ hover:bg-brand-primary-hover" },
+        "navy":          { "value": "{brand.color.navy}",          "type": "color", "description": "→ bg-brand-navy" },
+        "subtle":        { "value": "{primitive.color.red.50}",    "type": "color", "description": "→ bg-brand-subtle (table headers, tinted rows)" }
+      },
+
+      "text": {
+        "primary":   { "value": "{primitive.color.gray.900}", "type": "color", "description": "→ text-content-primary" },
+        "secondary": { "value": "{primitive.color.gray.700}", "type": "color", "description": "→ text-content-secondary" },
+        "muted":     { "value": "{primitive.color.gray.500}", "type": "color", "description": "→ text-content-muted" },
+        "disabled":  { "value": "{primitive.color.gray.300}", "type": "color", "description": "→ text-content-disabled" },
+        "inverse":   { "value": "{primitive.color.white}",    "type": "color", "description": "→ text-content-inverse (on dark bg)" },
+        "brand":     { "value": "{brand.color.primary}",      "type": "color", "description": "→ text-content-brand" },
+        "error":     { "value": "{primitive.color.red.600}",  "type": "color", "description": "→ text-content-error" },
+        "success":   { "value": "{primitive.color.green.700}","type": "color", "description": "→ text-content-success" },
+        "warning":   { "value": "{primitive.color.yellow.700}","type": "color","description": "→ text-content-warning" }
+      },
+
+      "bg": {
+        "page":        { "value": "{primitive.color.gray.50}",  "type": "color", "description": "→ bg-surface-page" },
+        "surface":     { "value": "{primitive.color.white}",    "type": "color", "description": "→ bg-surface" },
+        "subtle":      { "value": "{primitive.color.gray.100}", "type": "color", "description": "→ bg-surface-subtle (hover rows, tags)" },
+        "overlay":     { "value": "rgba(0,0,0,0.40)",           "type": "color", "description": "→ bg-overlay (modal backdrop)" },
+        "brand":       { "value": "{brand.color.primary}",      "type": "color", "description": "→ bg-fill-brand (primary buttons)" },
+        "brand-hover": { "value": "{brand.color.primary-hover}","type": "color", "description": "→ bg-fill-brand-hover" },
+        "brand-subtle":{ "value": "{primitive.color.red.50}",   "type": "color", "description": "→ bg-fill-brand-subtle (table headers)" },
+        "error":       { "value": "{primitive.color.red.50}",   "type": "color", "description": "→ bg-fill-error" },
+        "success":     { "value": "{primitive.color.green.50}", "type": "color", "description": "→ bg-fill-success" },
+        "warning":     { "value": "{primitive.color.yellow.50}","type": "color", "description": "→ bg-fill-warning" },
+        "info":        { "value": "{primitive.color.blue.50}",  "type": "color", "description": "→ bg-fill-info" }
+      },
+
+      "border": {
+        "default": { "value": "{primitive.color.gray.200}", "type": "color", "description": "→ border-line-default" },
+        "strong":  { "value": "{primitive.color.gray.300}", "type": "color", "description": "→ border-line-strong" },
+        "muted":   { "value": "{primitive.color.gray.100}", "type": "color", "description": "→ border-line-muted (row separators)" },
+        "focus":   { "value": "{brand.color.primary}",      "type": "color", "description": "→ border-line-focus (input focus ring)" },
+        "brand":   { "value": "{brand.color.primary}",      "type": "color", "description": "→ border-line-brand (active tabs)" },
+        "error":   { "value": "{primitive.color.red.500}",  "type": "color", "description": "→ border-line-error" }
+      },
+
+      "status": {
+        "upcoming-bg":     { "value": "{primitive.color.blue.100}",   "type": "color" },
+        "upcoming-text":   { "value": "{primitive.color.blue.800}",   "type": "color" },
+        "upcoming-border": { "value": "{primitive.color.blue.200}",   "type": "color" },
+
+        "ongoing-bg":      { "value": "{primitive.color.yellow.100}", "type": "color" },
+        "ongoing-text":    { "value": "{primitive.color.yellow.800}", "type": "color" },
+        "ongoing-border":  { "value": "{primitive.color.yellow.300}", "type": "color" },
+
+        "return-bg":       { "value": "{primitive.color.purple.100}", "type": "color" },
+        "return-text":     { "value": "{primitive.color.purple.700}", "type": "color" },
+        "return-border":   { "value": "{primitive.color.purple.200}", "type": "color" },
+
+        "completed-bg":    { "value": "{primitive.color.green.100}",  "type": "color" },
+        "completed-text":  { "value": "{primitive.color.green.800}",  "type": "color" },
+        "completed-border":{ "value": "{primitive.color.green.300}",  "type": "color" },
+
+        "cancelled-bg":    { "value": "{primitive.color.gray.100}",   "type": "color" },
+        "cancelled-text":  { "value": "{primitive.color.gray.600}",   "type": "color" },
+        "cancelled-border":{ "value": "{primitive.color.gray.300}",   "type": "color" },
+
+        "overdue-bg":      { "value": "{primitive.color.red.100}",    "type": "color" },
+        "overdue-text":    { "value": "{primitive.color.red.700}",    "type": "color" },
+        "overdue-border":  { "value": "{primitive.color.red.300}",    "type": "color" }
+      }
+    },
+
+    "font-size": {
+      "xs":   { "value": "12", "type": "fontSizes" },
+      "sm":   { "value": "14", "type": "fontSizes" },
+      "base": { "value": "16", "type": "fontSizes" },
+      "lg":   { "value": "18", "type": "fontSizes" },
+      "xl":   { "value": "20", "type": "fontSizes" },
+      "2xl":  { "value": "24", "type": "fontSizes" },
+      "3xl":  { "value": "30", "type": "fontSizes" }
+    },
+
+    "font-weight": {
+      "regular":  { "value": "400", "type": "fontWeights" },
+      "medium":   { "value": "500", "type": "fontWeights" },
+      "semibold": { "value": "600", "type": "fontWeights" },
+      "bold":     { "value": "700", "type": "fontWeights" }
+    },
+
+    "border-radius": {
+      "none": { "value": "0",    "type": "borderRadius" },
+      "sm":   { "value": "4",    "type": "borderRadius" },
+      "md":   { "value": "6",    "type": "borderRadius" },
+      "lg":   { "value": "8",    "type": "borderRadius" },
+      "xl":   { "value": "12",   "type": "borderRadius" },
+      "2xl":  { "value": "16",   "type": "borderRadius" },
+      "full": { "value": "9999", "type": "borderRadius" }
+    },
+
+    "spacing": {
+      "1":  { "value": "4",  "type": "spacing" },
+      "2":  { "value": "8",  "type": "spacing" },
+      "3":  { "value": "12", "type": "spacing" },
+      "4":  { "value": "16", "type": "spacing" },
+      "5":  { "value": "20", "type": "spacing" },
+      "6":  { "value": "24", "type": "spacing" },
+      "8":  { "value": "32", "type": "spacing" },
+      "10": { "value": "40", "type": "spacing" },
+      "12": { "value": "48", "type": "spacing" },
+      "16": { "value": "64", "type": "spacing" }
+    },
+
+    "box-shadow": {
+      "sm":  { "value": "0 1px 2px rgba(0,0,0,0.05)",  "type": "boxShadow" },
+      "md":  { "value": "0 4px 6px rgba(0,0,0,0.07)",  "type": "boxShadow" },
+      "lg":  { "value": "0 10px 15px rgba(0,0,0,0.10)","type": "boxShadow" },
+      "xl":  { "value": "0 20px 25px rgba(0,0,0,0.12)","type": "boxShadow" },
+      "2xl": { "value": "0 25px 50px rgba(0,0,0,0.25)","type": "boxShadow" }
+    }
+  }
+}

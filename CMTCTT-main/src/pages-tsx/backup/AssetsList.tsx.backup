@@ -1,0 +1,452 @@
+import { useState, useRef, useEffect } from "react";
+import { Pagination } from "@/components/ui/Pagination";
+import { assets } from "@/data/systemHardware";
+import type { AssetStatus } from "@/data/systemHardware";
+import { Search, Eye, MoreVertical, Filter, Calendar, Check, Edit2, Archive, X } from "lucide-react";
+import { SortIcon, type SortDir, nextSort, sortBy } from "@/lib/sortUtils";
+import { cn } from "@/lib/utils";
+
+const PER_PAGE = 10;
+
+const TABS = ["Overall", "Issued", "Maintenance", "Overdue", "Pending Return", "Not Returned", "Missing", "No RFI"] as const;
+type Tab = (typeof TABS)[number];
+
+const TAB_STATUS_MAP: Partial<Record<Tab, AssetStatus>> = {
+  Issued: "Issued",
+  Maintenance: "Maintenance",
+  Overdue: "Overdue",
+  "Pending Return": "Pending Return",
+  "Not Returned": "Not Returned",
+  Missing: "Missing",
+};
+
+const ASSET_TYPES = ["SAR21", "LMG", "M16", "Lenovo Laptop"];
+const ASSET_CATEGORIES = ["Weapon", "Laptop Computer Device"];
+
+function AssetStatusBadge({ status }: { status: AssetStatus }) {
+  const styles: Record<AssetStatus, string> = {
+    Available:       "bg-green-50 text-green-600 border-green-200",
+    Issued:          "bg-purple-50 text-purple-600 border-purple-200",
+    "Pending Return":"bg-orange-50 text-orange-500 border-orange-200",
+    "Not Returned":  "bg-red-50 text-red-500 border-red-200",
+    Missing:         "bg-gray-100 text-gray-600 border-gray-200",
+    Maintenance:     "bg-yellow-50 text-yellow-600 border-yellow-200",
+    Overdue:         "bg-red-100 text-red-700 border-red-300",
+  };
+  return (
+    <span className={cn("inline-flex items-center rounded-full border text-xs font-medium px-2.5 py-0.5", styles[status])}>
+      {status}
+    </span>
+  );
+}
+
+// Edit Asset Modal
+function EditAssetModal({ asset, onClose }: { asset: typeof assets[0]; onClose: () => void }) {
+  const [formData, setFormData] = useState({
+    name: asset.name,
+    serialNumber: asset.serialNumber,
+    assetCategory: asset.assetCategory,
+    assetType: asset.assetType,
+  });
+
+  return (
+    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4 md:p-6">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-4 md:p-8">
+        <div className="flex flex-col sm:flex-row sm:items-start gap-3 mb-6">
+          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+            <Check size={20} className="text-green-600" />
+          </div>
+          <div>
+            <h3 className="text-lg font-bold text-gray-800">Edit Asset Detail</h3>
+            <p className="text-sm text-gray-500 mt-0.5">Please fill all the information.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Asset <span className="text-brand-primary">*</span></label>
+            <input
+              type="text"
+              value={formData.name}
+              onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Serial No <span className="text-brand-primary">*</span></label>
+            <input
+              type="text"
+              value={formData.serialNumber}
+              onChange={(e) => setFormData({ ...formData, serialNumber: e.target.value })}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Category <span className="text-brand-primary">*</span></label>
+            <select
+              value={formData.assetCategory}
+              onChange={(e) => setFormData({ ...formData, assetCategory: e.target.value })}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            >
+              {ASSET_CATEGORIES.map((cat) => (
+                <option key={cat} value={cat}>{cat}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Asset Type <span className="text-brand-primary">*</span></label>
+            <select
+              value={formData.assetType}
+              onChange={(e) => setFormData({ ...formData, assetType: e.target.value })}
+              className="w-full px-4 py-2.5 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary focus:border-transparent"
+            >
+              {ASSET_TYPES.map((type) => (
+                <option key={type} value={type}>{type}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-1 md:grid-cols-2 gap-3">
+          <button onClick={onClose} type="button" className="py-3 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={onClose} type="button" className="py-3 bg-brand-primary text-white rounded-lg text-sm font-semibold hover:bg-brand-primary-hover">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Action Menu
+function ActionMenu({ onEdit, menuRef }: { onEdit: () => void; menuRef: React.RefObject<HTMLDivElement | null> }) {
+  return (
+    <div ref={menuRef} className="absolute right-0 mt-1 w-40 bg-white border border-gray-200 rounded-lg shadow-lg z-40">
+      <button onClick={onEdit} className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50 border-b border-gray-100">
+        <Edit2 size={16} />
+        Edit
+      </button>
+      <button className="w-full flex items-center gap-2 px-4 py-3 text-sm text-gray-700 hover:bg-gray-50">
+        <Archive size={16} />
+        Archive
+      </button>
+    </div>
+  );
+}
+
+// Filter Drawer
+function FilterDrawer({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
+  const [selectedTypes, setSelectedTypes] = useState<string[]>([]);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+
+  const toggleType = (type: string) => {
+    setSelectedTypes((prev) =>
+      prev.includes(type) ? prev.filter((t) => t !== type) : [...prev, type]
+    );
+  };
+
+  const toggleCategory = (cat: string) => {
+    setSelectedCategories((prev) =>
+      prev.includes(cat) ? prev.filter((c) => c !== cat) : [...prev, cat]
+    );
+  };
+
+  const totalSelected = selectedTypes.length + selectedCategories.length;
+
+  return (
+    <>
+      {isOpen && <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />}
+      <div
+        className={cn(
+          "fixed right-0 top-0 bottom-0 w-80 bg-white shadow-lg transform transition-transform z-50",
+          isOpen ? "translate-x-0" : "translate-x-full"
+        )}
+      >
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between p-4 md:p-6 border-b border-gray-200 gap-3">
+          <h2 className="text-lg font-bold text-gray-800">Filters</h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-4 md:p-6">
+          <div className="mb-6">
+            <h3 className="text-sm font-semibold text-gray-800 mb-3">Total Selected - {totalSelected}</h3>
+          </div>
+
+          {/* Asset Types */}
+          <div className="mb-6">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">Asset Types</h3>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedTypes.length === ASSET_TYPES.length}
+                  onChange={() => setSelectedTypes(selectedTypes.length === ASSET_TYPES.length ? [] : [...ASSET_TYPES])}
+                  className="w-4 h-4 accent-brand-primary rounded"
+                />
+                <span className="text-sm text-gray-700">All</span>
+              </label>
+              {ASSET_TYPES.map((type) => (
+                <label key={type} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedTypes.includes(type)}
+                    onChange={() => toggleType(type)}
+                    className="w-4 h-4 accent-brand-primary rounded"
+                  />
+                  <span className="text-sm text-gray-700">{type}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Asset Categories */}
+          <div className="mb-6">
+            <h3 className="text-sm font-bold text-gray-800 mb-3">Asset Categories</h3>
+            <div className="space-y-2">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={selectedCategories.length === ASSET_CATEGORIES.length}
+                  onChange={() => setSelectedCategories(selectedCategories.length === ASSET_CATEGORIES.length ? [] : [...ASSET_CATEGORIES])}
+                  className="w-4 h-4 accent-brand-primary rounded"
+                />
+                <span className="text-sm text-gray-700">All</span>
+              </label>
+              {ASSET_CATEGORIES.map((cat) => (
+                <label key={cat} className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(cat)}
+                    onChange={() => toggleCategory(cat)}
+                    className="w-4 h-4 accent-brand-primary rounded"
+                  />
+                  <span className="text-sm text-gray-700">{cat}</span>
+                </label>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t border-gray-200 p-4 md:p-6 flex flex-col sm:flex-row gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 border border-gray-200 rounded-lg text-sm font-semibold text-gray-600 hover:bg-gray-50">
+            Clear
+          </button>
+          <button onClick={onClose} className="flex-1 py-2.5 bg-brand-primary text-white rounded-lg text-sm font-semibold hover:bg-brand-primary-hover">
+            Apply Filters
+          </button>
+        </div>
+      </div>
+    </>
+  );
+}
+
+export function AssetsList({ onNavigate }: { onNavigate?: (path: string) => void }) {
+  const [activeTab, setActiveTab] = useState<Tab>("Overall");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  const [editingAsset, setEditingAsset] = useState<typeof assets[0] | null>(null);
+  const [showFilters, setShowFilters] = useState(false);
+  const [sortField, setSortField] = useState("");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const handleSort = (field: string) => {
+    const s = nextSort(sortField, field, sortDir);
+    setSortField(s.field);
+    setSortDir(s.dir);
+    setCurrentPage(1);
+  };
+
+  const tabCounts = TABS.reduce((acc, tab) => {
+    acc[tab] = tab === "Overall" || tab === "No RFI"
+      ? assets.length
+      : assets.filter((a) => a.status === TAB_STATUS_MAP[tab]).length;
+    return acc;
+  }, {} as Record<Tab, number>);
+
+  const tabFiltered = activeTab === "Overall" || activeTab === "No RFI"
+    ? assets
+    : assets.filter((a) => a.status === TAB_STATUS_MAP[activeTab]);
+
+  const filtered = tabFiltered.filter(
+    (a) => !searchQuery || a.name.toLowerCase().includes(searchQuery.toLowerCase()) || a.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const sorted = sortField ? sortBy(filtered, sortField as keyof typeof filtered[0], sortDir) : filtered;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
+  const paginated = sorted.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  };
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenu(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-5 gap-3">
+          <h1 className="text-xl font-semibold text-brand-primary">Asset List</h1>
+          <button
+            onClick={() => onNavigate?.("/system-hardware/asset-creation")}
+            className="flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 font-semibold shadow-sm transition-colors"
+          >
+            <span className="text-base leading-none">+</span>
+            Add Asset
+          </button>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200">
+          {/* Tabs */}
+          <div className="flex border-b border-gray-100 overflow-x-auto">
+            {TABS.map((tab) => {
+              const count = tabCounts[tab] ?? 0;
+              return (
+                <button
+                  key={tab}
+                  onClick={() => handleTabChange(tab)}
+                  className={cn(
+                    "flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors relative",
+                    activeTab === tab ? "text-brand-primary" : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  {tab}
+                  {count > 0 && (
+                    <span className={cn(
+                      "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold",
+                      activeTab === tab ? "bg-brand-primary text-white" : "bg-gray-100 text-gray-500"
+                    )}>
+                      {count}
+                    </span>
+                  )}
+                  {activeTab === tab && (
+                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-t-full" />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+
+          {/* Toolbar */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md w-full md:w-56 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <button className="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-50">
+                <Calendar size={14} />
+                Select Date
+              </button>
+              <button onClick={() => setShowFilters(true)} className="flex items-center gap-1.5 text-sm text-gray-600 border border-gray-200 px-3 py-1.5 rounded-md hover:bg-gray-50">
+                <Filter size={14} />
+                Filters
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className="bg-red-50 border-b border-gray-100">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-12">No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[180px]">
+                    <button onClick={() => handleSort("name")} className="flex items-center gap-1 hover:text-brand-primary-hover transition-colors">
+                      Asset <SortIcon active={sortField === "name"} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[160px]">Asset Serial Number</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">Asset Type</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">Asset Category</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[130px]">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[120px]">Issued Date</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[120px]">Created By</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-20">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((asset, idx) => (
+                  <tr key={asset.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3.5 text-sm text-gray-700">
+                      {(currentPage - 1) * PER_PAGE + idx + 1}
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-gray-800 font-medium">{asset.name}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">{asset.serialNumber}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">{asset.assetType}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">{asset.assetCategory}</td>
+                    <td className="px-4 py-3.5">
+                      <AssetStatusBadge status={asset.status} />
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">{asset.issuedDate}</td>
+                    <td className="px-4 py-3.5 text-sm">
+                      <div className="text-gray-800 font-medium">{asset.createdBy || "—"}</div>
+                      <div className="text-xs text-gray-400">{asset.createdByRole || ""}</div>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2 relative">
+                        <button onClick={() => onNavigate?.(`/system-hardware/asset-detail/${asset.id}`)} className="text-gray-400 hover:text-gray-600">
+                          <Eye size={16} />
+                        </button>
+                        <button onClick={() => setOpenMenu(openMenu === asset.id ? null : asset.id)} className="text-gray-400 hover:text-gray-600">
+                          <MoreVertical size={16} />
+                        </button>
+                        {openMenu === asset.id && (
+                          <ActionMenu
+                            onEdit={() => {
+                              setEditingAsset(asset);
+                              setOpenMenu(null);
+                            }}
+                            menuRef={menuRef}
+                          />
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination
+            current={currentPage}
+            total={totalPages}
+            perPage={PER_PAGE}
+            totalItems={filtered.length}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      </div>
+
+      {/* Edit Asset Modal */}
+      {editingAsset && <EditAssetModal asset={editingAsset} onClose={() => setEditingAsset(null)} />}
+
+      {/* Filter Drawer */}
+      <FilterDrawer isOpen={showFilters} onClose={() => setShowFilters(false)} />
+    </div>
+  );
+}

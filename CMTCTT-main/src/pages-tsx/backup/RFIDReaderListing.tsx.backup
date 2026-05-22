@@ -1,0 +1,562 @@
+import { useState, useRef, useEffect } from "react";
+import { Pagination } from "@/components/ui/Pagination";
+import { rfidReaders as initialReaders } from "@/data/rfidConfig";
+import type { RFIDReader } from "@/data/rfidConfig";
+import { Search, Trash2, Pencil, MoreVertical, BellOff, Bell, CheckCircle2, ChevronDown, AlertTriangle } from "lucide-react";
+import { SortIcon, type SortDir, nextSort, sortBy } from "@/lib/sortUtils";
+import { cn } from "@/lib/utils";
+
+/* ─── Shared form fields component ─── */
+
+interface ReaderFormProps {
+  macAddress: string; setMacAddress: (v: string) => void; macError: boolean;
+  ipAddress: string; setIpAddress: (v: string) => void; ipError: boolean;
+  displayName: string; setDisplayName: (v: string) => void; displayNameError: boolean;
+  mqttTopic: string; setMqttTopic: (v: string) => void; mqttError: boolean;
+  serialNumber: string; setSerialNumber: (v: string) => void; serialError: boolean;
+  firmwareVersion: string; setFirmwareVersion: (v: string) => void;
+  status: string; setStatus: (v: string) => void; statusError: boolean; setStatusError: (v: boolean) => void;
+}
+
+function ReaderFormFields({
+  macAddress, setMacAddress, macError,
+  ipAddress, setIpAddress, ipError,
+  displayName, setDisplayName, displayNameError,
+  mqttTopic, setMqttTopic, mqttError,
+  serialNumber, setSerialNumber, serialError,
+  firmwareVersion, setFirmwareVersion,
+  status, setStatus, statusError, setStatusError,
+}: ReaderFormProps) {
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (statusRef.current && !statusRef.current.contains(e.target as Node)) setStatusOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  const inputClass = (error: boolean) => cn(
+    "w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary",
+    error ? "border-red-500" : "border-gray-200"
+  );
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          RFID Reader Mac Address <span className="text-brand-primary">*</span>
+        </label>
+        <input type="text" value={macAddress}
+          onChange={(e) => { setMacAddress(e.target.value); }}
+          placeholder="Enter RFID Reader MAC Address (e.g, 84248DF03FC8, etc)"
+          className={inputClass(macError)} />
+        {macError && <p className="mt-1 text-xs text-red-500">RFID Reader Mac Address is required</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          RFID Reader IP Address <span className="text-brand-primary">*</span>
+        </label>
+        <input type="text" value={ipAddress}
+          onChange={(e) => { setIpAddress(e.target.value); }}
+          placeholder="Enter RFID Reader IP Address (e.g, 000.999.999, etc)"
+          className={inputClass(ipError)} />
+        {ipError && <p className="mt-1 text-xs text-red-500">RFID Reader IP Address is required</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          RFID Reader Display Name <span className="text-brand-primary">*</span>
+        </label>
+        <input type="text" value={displayName}
+          onChange={(e) => { setDisplayName(e.target.value); }}
+          placeholder="Enter RFID Reader Display Name (e.g, Reader A, etc)"
+          className={inputClass(displayNameError)} />
+        {displayNameError && <p className="mt-1 text-xs text-red-500">RFID Reader Display Name is required</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          MQTT Topic <span className="text-brand-primary">*</span>
+        </label>
+        <input type="text" value={mqttTopic}
+          onChange={(e) => { setMqttTopic(e.target.value); }}
+          placeholder="Enter MQTT Topic"
+          className={inputClass(mqttError)} />
+        {mqttError && <p className="mt-1 text-xs text-red-500">MQTT Topic is required</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          RFID Reader Serial Number <span className="text-brand-primary">*</span>
+        </label>
+        <input type="text" value={serialNumber}
+          onChange={(e) => { setSerialNumber(e.target.value); }}
+          placeholder="Enter RFID reader serial number (e.g, JX3621390195, etc)"
+          className={inputClass(serialError)} />
+        {serialError && <p className="mt-1 text-xs text-red-500">RFID Reader Serial Number is required</p>}
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          RFID Reader Firmware Version
+        </label>
+        <input type="text" value={firmwareVersion}
+          onChange={(e) => setFirmwareVersion(e.target.value)}
+          placeholder="Enter RFID Reader Firmware Version (e.g, 1.0.0, etc)"
+          className={inputClass(false)} />
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Status <span className="text-brand-primary">*</span>
+        </label>
+        <div className="relative" ref={statusRef}>
+          <button type="button" onClick={() => setStatusOpen((o) => !o)}
+            className={cn(
+              "w-full flex items-center justify-between px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary bg-white",
+              statusError ? "border-red-500" : "border-gray-200"
+            )}>
+            <span className={status ? "text-gray-800" : "text-gray-400"}>{status || "Select status"}</span>
+            <ChevronDown size={14} className={cn("text-gray-400 transition-transform", statusOpen && "rotate-180")} />
+          </button>
+          {statusOpen && (
+            <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+              {["Active", "Inactive"].map((opt) => (
+                <button key={opt} type="button"
+                  onClick={() => { setStatus(opt); setStatusOpen(false); setStatusError(false); }}
+                  className={cn("w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50 transition-colors",
+                    status === opt ? "text-brand-primary font-medium" : "text-gray-700")}>
+                  {opt}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        {statusError && <p className="mt-1 text-xs text-red-500">Status is required</p>}
+      </div>
+    </div>
+  );
+}
+
+/* ─── Add Modal ─── */
+
+function AddRFIDReaderModal({ onClose, onAdd }: { onClose: () => void; onAdd: (r: RFIDReader) => void }) {
+  const [macAddress, setMacAddress] = useState(""); const [macError, setMacError] = useState(false);
+  const [ipAddress, setIpAddress] = useState(""); const [ipError, setIpError] = useState(false);
+  const [displayName, setDisplayName] = useState(""); const [displayNameError, setDisplayNameError] = useState(false);
+  const [mqttTopic, setMqttTopic] = useState(""); const [mqttError, setMqttError] = useState(false);
+  const [serialNumber, setSerialNumber] = useState(""); const [serialError, setSerialError] = useState(false);
+  const [firmwareVersion, setFirmwareVersion] = useState("");
+  const [status, setStatus] = useState(""); const [statusError, setStatusError] = useState(false);
+
+  const handleConfirm = () => {
+    const e1 = !macAddress.trim(); const e2 = !ipAddress.trim();
+    const e3 = !displayName.trim(); const e4 = !mqttTopic.trim();
+    const e5 = !serialNumber.trim(); const e6 = !status;
+    setMacError(e1); setIpError(e2); setDisplayNameError(e3);
+    setMqttError(e4); setSerialError(e5); setStatusError(e6);
+    if (e1 || e2 || e3 || e4 || e5 || e6) return;
+    onAdd({
+      id: `r${Date.now()}`, no: 0,
+      displayName, macAddress, ipAddress,
+      serialNumber, firmwareVersion,
+      status: status as "Active" | "Inactive",
+      armStatus: "Disarm",
+    });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
+      <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+            <CheckCircle2 size={20} className="text-green-500" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Add New RFID Reader</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Please fill all the information.</p>
+          </div>
+        </div>
+        <ReaderFormFields
+          macAddress={macAddress} setMacAddress={setMacAddress} macError={macError}
+          ipAddress={ipAddress} setIpAddress={setIpAddress} ipError={ipError}
+          displayName={displayName} setDisplayName={setDisplayName} displayNameError={displayNameError}
+          mqttTopic={mqttTopic} setMqttTopic={setMqttTopic} mqttError={mqttError}
+          serialNumber={serialNumber} setSerialNumber={setSerialNumber} serialError={serialError}
+          firmwareVersion={firmwareVersion} setFirmwareVersion={setFirmwareVersion}
+          status={status} setStatus={setStatus} statusError={statusError} setStatusError={setStatusError}
+        />
+        <div className="flex gap-3 mt-8">
+          <button type="button" onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button type="button" onClick={handleConfirm}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover transition-colors">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Edit Modal ─── */
+
+function EditRFIDReaderModal({ reader, onClose, onSave }: {
+  reader: RFIDReader; onClose: () => void; onSave: (updated: RFIDReader) => void;
+}) {
+  const [macAddress, setMacAddress] = useState(reader.macAddress); const [macError, setMacError] = useState(false);
+  const [ipAddress, setIpAddress] = useState(reader.ipAddress); const [ipError, setIpError] = useState(false);
+  const [displayName, setDisplayName] = useState(reader.displayName); const [displayNameError, setDisplayNameError] = useState(false);
+  const [mqttTopic, setMqttTopic] = useState(""); const [mqttError, setMqttError] = useState(false);
+  const [serialNumber, setSerialNumber] = useState(reader.serialNumber); const [serialError, setSerialError] = useState(false);
+  const [firmwareVersion, setFirmwareVersion] = useState("");
+  const [status, setStatus] = useState<string>(reader.status); const [statusError, setStatusError] = useState(false);
+
+  const handleConfirm = () => {
+    const e1 = !macAddress.trim(); const e2 = !ipAddress.trim();
+    const e3 = !displayName.trim(); const e4 = !mqttTopic.trim();
+    const e5 = !serialNumber.trim(); const e6 = !status;
+    setMacError(e1); setIpError(e2); setDisplayNameError(e3);
+    setMqttError(e4); setSerialError(e5); setStatusError(e6);
+    if (e1 || e2 || e3 || e4 || e5 || e6) return;
+    onSave({ ...reader, displayName, macAddress, ipAddress, serialNumber, status: status as "Active" | "Inactive" });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
+      <div className="bg-white max-w-md w-full rounded-2xl shadow-2xl p-8 max-h-[90vh] overflow-y-auto">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-blue-100 flex items-center justify-center">
+            <Pencil size={18} className="text-blue-500" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Edit RFID Reader</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Update the reader information.</p>
+          </div>
+        </div>
+        <ReaderFormFields
+          macAddress={macAddress} setMacAddress={setMacAddress} macError={macError}
+          ipAddress={ipAddress} setIpAddress={setIpAddress} ipError={ipError}
+          displayName={displayName} setDisplayName={setDisplayName} displayNameError={displayNameError}
+          mqttTopic={mqttTopic} setMqttTopic={setMqttTopic} mqttError={mqttError}
+          serialNumber={serialNumber} setSerialNumber={setSerialNumber} serialError={serialError}
+          firmwareVersion={firmwareVersion} setFirmwareVersion={setFirmwareVersion}
+          status={status} setStatus={setStatus} statusError={statusError} setStatusError={setStatusError}
+        />
+        <div className="flex gap-3 mt-8">
+          <button type="button" onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button type="button" onClick={handleConfirm}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover transition-colors">
+            Save Changes
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Delete Confirm Modal ─── */
+
+function DeleteConfirmModal({ count, onClose, onConfirm }: {
+  count: number; onClose: () => void; onConfirm: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-sm flex items-center justify-center px-4">
+      <div className="bg-white max-w-sm w-full rounded-2xl shadow-2xl p-8">
+        <div className="flex items-start gap-4 mb-4">
+          <div className="flex-shrink-0 w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+            <AlertTriangle size={20} className="text-red-500" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Delete RFID Reader</h2>
+            <p className="text-sm text-gray-500 mt-0.5">
+              Are you sure you want to delete {count} reader{count > 1 ? "s" : ""}? This action cannot be undone.
+            </p>
+          </div>
+        </div>
+        <div className="flex gap-3 mt-6">
+          <button type="button" onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50 transition-colors">
+            Cancel
+          </button>
+          <button type="button" onClick={onConfirm}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-red-600 text-white hover:bg-red-700 transition-colors">
+            Delete
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Row Action Menu ─── */
+
+function RowActionMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handleClick(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", handleClick);
+    return () => document.removeEventListener("mousedown", handleClick);
+  }, []);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen((o) => !o)}
+        className="text-gray-400 hover:text-gray-600 p-1 rounded hover:bg-gray-100 transition-colors">
+        <MoreVertical size={16} />
+      </button>
+      {open && (
+        <div className="absolute right-0 z-20 mt-1 w-44 bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+          <button onClick={() => { setOpen(false); onEdit(); }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors">
+            <Pencil size={14} className="text-gray-400" />
+            Edit Reader
+          </button>
+          <button onClick={() => { setOpen(false); onDelete(); }}
+            className="w-full flex items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 transition-colors">
+            <Trash2 size={14} className="text-red-400" />
+            Delete Reader
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/* ─── Main Page ─── */
+
+const PER_PAGE = 10;
+
+export function RFIDReaderListing() {
+  const [readers, setReaders] = useState<RFIDReader[]>(initialReaders);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState("");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [editTarget, setEditTarget] = useState<RFIDReader | null>(null);
+  const [deleteIds, setDeleteIds] = useState<Set<string> | null>(null);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const handleSort = (field: string) => {
+    const s = nextSort(sortField, field, sortDir);
+    setSortField(s.field);
+    setSortDir(s.dir);
+    setCurrentPage(1);
+  };
+
+  const filtered = readers.filter(
+    (r) => !searchQuery || r.displayName.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const sorted = sortField ? sortBy(filtered, sortField as keyof (typeof filtered)[0], sortDir) : filtered;
+  const paginated = sorted.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const allSelected  = paginated.length > 0 && paginated.every((r) => selected.has(r.id));
+  const someSelected = paginated.some((r) => selected.has(r.id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected && !allSelected;
+    }
+  }, [someSelected, allSelected]);
+
+  const toggleSelect = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(paginated.map((r) => r.id)));
+
+  const handleDelete = (ids: Set<string>) => {
+    setReaders((prev) => prev.filter((r) => !ids.has(r.id)));
+    setSelected((prev) => { const n = new Set(prev); ids.forEach((id) => n.delete(id)); return n; });
+    setDeleteIds(null);
+  };
+
+  const handleSave = (updated: RFIDReader) => {
+    setReaders((prev) => prev.map((r) => r.id === updated.id ? updated : r));
+  };
+
+  const handleAdd = (r: RFIDReader) => {
+    setReaders((prev) => [...prev, { ...r, no: prev.length + 1 }]);
+  };
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl font-semibold text-brand-primary">RFID Reader Listing</h1>
+          <div className="flex items-center gap-2">
+            {selected.size > 0 && (
+              <button
+                onClick={() => setDeleteIds(new Set(selected))}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-red-600 hover:bg-red-700 text-white rounded-md font-semibold transition-colors shadow-sm"
+              >
+                <Trash2 size={14} />
+                Delete ({selected.size})
+              </button>
+            )}
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 font-semibold shadow-sm transition-colors"
+            >
+              <span className="text-base leading-none">+</span>
+              Add RFID Reader
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200">
+          {/* Toolbar */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Search"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md w-56 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+              />
+            </div>
+            <div className="flex items-center gap-3">
+              <button className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800 font-medium">
+                <BellOff size={14} />
+                Alarm Off
+              </button>
+              <button className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-800 font-medium">
+                <Bell size={14} />
+                Alarm On
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className="bg-red-50 border-b border-gray-100">
+                  <th className="w-10 px-4 py-3">
+                    <input
+                      ref={selectAllRef}
+                      type="checkbox"
+                      className="rounded border-gray-300 accent-brand-primary"
+                      checked={allSelected}
+                      onChange={toggleAll}
+                    />
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-12">No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[160px]">
+                    <button onClick={() => handleSort("displayName")} className="flex items-center gap-1 hover:text-brand-primary-hover transition-colors">
+                      Display Name <SortIcon active={sortField === "displayName"} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[180px]">Reader MAC Address</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[100px]">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[100px]">Arm Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[160px]">Serial Number</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[130px]">IP Address</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-20">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((reader, idx) => (
+                  <tr key={reader.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3.5 text-center">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(reader.id)}
+                        onChange={() => toggleSelect(reader.id)}
+                        className="rounded border-gray-300 accent-brand-primary"
+                      />
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">{(currentPage - 1) * PER_PAGE + idx + 1}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-800 font-medium">{reader.displayName}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700 font-mono">{reader.macAddress}</td>
+                    <td className="px-4 py-3.5">
+                      <span className={cn(
+                        "inline-flex items-center rounded-full border text-xs font-medium px-2.5 py-0.5",
+                        reader.status === "Active"
+                          ? "bg-green-50 text-green-600 border-green-200"
+                          : "bg-orange-50 text-orange-500 border-orange-200"
+                      )}>
+                        {reader.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center rounded-full border text-xs font-medium px-2.5 py-0.5 bg-green-50 text-green-600 border-green-200">
+                        {reader.armStatus}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700 font-mono">{reader.serialNumber}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700 font-mono">{reader.ipAddress}</td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditTarget(reader)}
+                          className="text-gray-400 hover:text-brand-primary p-1 rounded hover:bg-gray-100 transition-colors"
+                        >
+                          <Pencil size={15} />
+                        </button>
+                        <RowActionMenu
+                          onEdit={() => setEditTarget(reader)}
+                          onDelete={() => setDeleteIds(new Set([reader.id]))}
+                        />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination
+            current={currentPage}
+            total={totalPages}
+            perPage={PER_PAGE}
+            totalItems={filtered.length}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      </div>
+
+      {showAddModal && (
+        <AddRFIDReaderModal onClose={() => setShowAddModal(false)} onAdd={handleAdd} />
+      )}
+      {editTarget && (
+        <EditRFIDReaderModal
+          reader={editTarget}
+          onClose={() => setEditTarget(null)}
+          onSave={handleSave}
+        />
+      )}
+      {deleteIds && (
+        <DeleteConfirmModal
+          count={deleteIds.size}
+          onClose={() => setDeleteIds(null)}
+          onConfirm={() => handleDelete(deleteIds)}
+        />
+      )}
+    </div>
+  );
+}

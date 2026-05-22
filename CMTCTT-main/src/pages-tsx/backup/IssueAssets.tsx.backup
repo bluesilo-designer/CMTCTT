@@ -1,0 +1,356 @@
+import { useState, useEffect } from "react";
+import { ArrowLeft, ArrowRight, Trash2, Check, ChevronDown, X } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+interface ScannedAsset {
+  id: string;
+  no: number;
+  name: string;
+  assetTagId: string;
+  assetType: string;
+  assetCategory: string;
+  status: "Available" | "Issued";
+  targetBaseStation: string;
+}
+
+const BASE_STATION_OPTIONS = ["SWT-01", "SWT-02", "SWT-04", "SWT-05", "IMT-01", "IMT-02", "IMT-03"];
+
+const DUMMY_SCANNED_ASSETS: ScannedAsset[] = [
+  {
+    id: "sa1",
+    no: 1,
+    name: "SAR21 Unit A",
+    assetTagId: "260427-SAR21001",
+    assetType: "SAR21",
+    assetCategory: "Weapon",
+    status: "Available",
+    targetBaseStation: "IMT-03",
+  },
+  {
+    id: "sa2",
+    no: 2,
+    name: "SAR21 Unit B",
+    assetTagId: "260427-SAR21002",
+    assetType: "SAR21",
+    assetCategory: "Weapon",
+    status: "Available",
+    targetBaseStation: "IMT-03",
+  },
+];
+
+export function IssueAssets({ onNavigate }: { onNavigate?: (path: string) => void }) {
+  const [phase, setPhase] = useState<"scanning" | "scanned">("scanning");
+  const [scannedAssets, setScannedAssets] = useState<ScannedAsset[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [baseStation, setBaseStation] = useState("IMT-03");
+  const [bookingId, setBookingId] = useState<string | null>(null);
+
+  // Parse URL params
+  useEffect(() => {
+    const hash = window.location.hash;
+    const bsMatch = hash.match(/baseStation=([^&]+)/);
+    if (bsMatch) setBaseStation(decodeURIComponent(bsMatch[1]));
+    const bkMatch = hash.match(/bookingIds=([^&]+)/);
+    if (bkMatch) setBookingId(decodeURIComponent(bkMatch[1]).split(",")[0]);
+  }, []);
+
+  // Auto-transition after 4 seconds
+  useEffect(() => {
+    if (phase === "scanning") {
+      const timer = setTimeout(() => {
+        setScannedAssets(DUMMY_SCANNED_ASSETS);
+        setPhase("scanned");
+      }, 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [phase]);
+
+  /* ── Checkbox helpers ── */
+  const allChecked = scannedAssets.length > 0 && selectedIds.size === scannedAssets.length;
+  const someChecked = selectedIds.size > 0 && !allChecked;
+
+  const toggleAll = () => {
+    if (allChecked) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(scannedAssets.map(a => a.id)));
+    }
+  };
+
+  const toggleOne = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  /* ── Delete helpers ── */
+  const handleDeleteOne = (id: string) => {
+    setScannedAssets(prev =>
+      prev.filter(a => a.id !== id).map((a, i) => ({ ...a, no: i + 1 }))
+    );
+    setSelectedIds(prev => { const n = new Set(prev); n.delete(id); return n; });
+  };
+
+  const handleDeleteSelected = () => {
+    setScannedAssets(prev =>
+      prev.filter(a => !selectedIds.has(a.id)).map((a, i) => ({ ...a, no: i + 1 }))
+    );
+    setSelectedIds(new Set());
+  };
+
+  const handleStationChange = (id: string, station: string) => {
+    setScannedAssets(prev => prev.map(a => a.id === id ? { ...a, targetBaseStation: station } : a));
+  };
+
+  const handleConfirm = () => setShowSuccess(true);
+
+  const handleSuccessClose = () => setShowSuccess(false);
+
+  const handleViewAssignment = () => {
+    setShowSuccess(false);
+    if (bookingId) {
+      window.location.hash = `#/bookings/detail?id=${bookingId}`;
+    } else {
+      onNavigate?.("/bookings/list");
+    }
+  };
+
+  const totalCount = scannedAssets.length;
+
+  return (
+    <div className="flex-1 flex flex-col bg-gray-50 overflow-hidden">
+      {/* ── Header ── */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <div>
+          <h2 className="text-sm font-bold text-gray-800">
+            Scan Assets for Training ({baseStation})
+            {phase === "scanned" && (
+              <span className="ml-2 text-green-500 font-medium text-xs">● Connected</span>
+            )}
+          </h2>
+          <p className="text-xs text-gray-400 mt-0.5">
+            Total Scans ({phase === "scanned" ? totalCount : 0} Assets)
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => onNavigate?.("/system-hardware/create-assignment")}
+            className="flex items-center gap-2 px-4 py-2 border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+          >
+            <ArrowLeft size={14} /> Back
+          </button>
+          {phase === "scanning" ? (
+            <button
+              type="button"
+              disabled
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-gray-100 text-gray-300 cursor-not-allowed"
+            >
+              <ArrowRight size={14} /> Next
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={handleConfirm}
+              className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover transition-colors"
+            >
+              <Check size={14} /> Confirm
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* ── Content ── */}
+      <div className="flex-1 overflow-auto p-5">
+        {phase === "scanning" ? (
+          /* ── Scanning State ── */
+          <div className="bg-white border border-gray-200 rounded-xl flex flex-col items-center justify-center py-20 px-6 text-center min-h-[400px]">
+            <div className="mb-8 relative">
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-36 h-36 rounded-full border-2 border-red-200 animate-ping opacity-30" />
+              </div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-28 h-28 rounded-full border-2 border-red-300 animate-ping opacity-40" style={{ animationDelay: "0.5s" }} />
+              </div>
+              <svg width="112" height="112" viewBox="0 0 112 112" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <circle cx="56" cy="56" r="54" stroke="#DC2626" strokeWidth="2" />
+                <path d="M 72 38 Q 82 47 82 56 Q 82 65 72 74" stroke="#DC2626" strokeWidth="2.5" fill="none" strokeLinecap="round" />
+                <path d="M 79 31 Q 93 42 93 56 Q 93 70 79 81" stroke="#DC2626" strokeWidth="2" fill="none" strokeLinecap="round" opacity="0.5" />
+                <rect x="28" y="38" width="30" height="38" rx="3" stroke="#DC2626" strokeWidth="2" fill="none" />
+                <rect x="32" y="42" width="22" height="8" rx="1" fill="#DC2626" opacity="0.25" />
+                <rect x="32" y="54" width="22" height="3" rx="1" fill="#DC2626" opacity="0.5" />
+                <rect x="32" y="60" width="14" height="3" rx="1" fill="#DC2626" opacity="0.3" />
+                <rect x="36" y="76" width="14" height="4" rx="1" fill="#DC2626" opacity="0.5" />
+              </svg>
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 mb-2">
+              Place your asset on the RFID reader.
+            </h3>
+            <p className="text-sm text-gray-500 max-w-sm leading-relaxed">
+              Please make sure to place one asset on the RFID Reader at a time,
+              wait for it to be scanned, and then place the next one.
+            </p>
+            <div className="mt-8 flex items-center gap-2 text-xs text-gray-400">
+              <span className="flex gap-1">
+                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                <span className="w-1.5 h-1.5 bg-gray-300 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+              </span>
+              Scanning in progress...
+            </div>
+          </div>
+        ) : (
+          /* ── Scanned State ── */
+          <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+            {/* Table toolbar */}
+            <div className="px-6 py-3 border-b border-gray-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-gray-700">
+                List of Assets ({totalCount} Assets)
+              </h3>
+              {selectedIds.size > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDeleteSelected}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-red-50 text-red-600 border border-red-200 hover:bg-red-100 transition-colors"
+                >
+                  <Trash2 size={13} />
+                  Delete Selected ({selectedIds.size})
+                </button>
+              )}
+            </div>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="bg-red-50 border-b border-gray-100">
+                    {/* Select-all checkbox */}
+                    <th className="px-4 py-3 w-10">
+                      <button
+                        type="button"
+                        onClick={toggleAll}
+                        className={cn(
+                          "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0",
+                          allChecked
+                            ? "bg-brand-primary border-brand-primary"
+                            : someChecked
+                            ? "bg-brand-primary/20 border-brand-primary"
+                            : "border-gray-300 bg-white hover:border-gray-400"
+                        )}
+                      >
+                        {allChecked && <Check size={10} className="text-white" strokeWidth={3} />}
+                        {someChecked && <span className="w-2 h-0.5 bg-brand-primary rounded-full" />}
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-10">No</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary">Asset Name</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary">Asset Tag ID</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary">Asset Type</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary">Asset Category</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary">Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary">Target Base Station</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scannedAssets.map((asset) => {
+                    const isChecked = selectedIds.has(asset.id);
+                    return (
+                      <tr
+                        key={asset.id}
+                        className={cn(
+                          "border-b border-gray-100 last:border-0 transition-colors",
+                          isChecked ? "bg-red-50/40" : "hover:bg-gray-50"
+                        )}
+                      >
+                        {/* Row checkbox */}
+                        <td className="px-4 py-3">
+                          <button
+                            type="button"
+                            onClick={() => toggleOne(asset.id)}
+                            className={cn(
+                              "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors flex-shrink-0",
+                              isChecked
+                                ? "bg-brand-primary border-brand-primary"
+                                : "border-gray-300 bg-white hover:border-gray-400"
+                            )}
+                          >
+                            {isChecked && <Check size={10} className="text-white" strokeWidth={3} />}
+                          </button>
+                        </td>
+                        <td className="px-4 py-3 text-sm text-gray-500">{asset.no}</td>
+                        <td className="px-4 py-3 text-sm font-medium text-gray-800">{asset.name}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600 font-mono">{asset.assetTagId}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{asset.assetType}</td>
+                        <td className="px-4 py-3 text-sm text-gray-600">{asset.assetCategory}</td>
+                        <td className="px-4 py-3">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-green-100 text-green-700">
+                            {asset.status}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3">
+                          <div className="relative inline-block">
+                            <select
+                              value={asset.targetBaseStation}
+                              onChange={(e) => handleStationChange(asset.id, e.target.value)}
+                              className="appearance-none text-sm text-gray-700 border border-gray-200 rounded-lg px-3 py-1.5 pr-8 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary cursor-pointer"
+                            >
+                              {BASE_STATION_OPTIONS.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                              ))}
+                            </select>
+                            <ChevronDown size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                          </div>
+                        </td>
+                        <td className="px-4 py-3">
+                          <button
+                            onClick={() => handleDeleteOne(asset.id)}
+                            className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"
+                            title="Remove asset"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* ── Success Dialog ── */}
+      {showSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm mx-4 p-8 flex flex-col items-center text-center relative">
+            <button
+              type="button"
+              onClick={handleSuccessClose}
+              className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <X size={18} />
+            </button>
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mb-4">
+              <Check size={32} className="text-green-600" strokeWidth={2.5} />
+            </div>
+            <h3 className="text-lg font-bold text-gray-800 mb-1">Assignment Created!</h3>
+            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+              Assets have been successfully issued and the assignment has been recorded.
+            </p>
+            <button
+              onClick={handleViewAssignment}
+              className="w-full px-5 py-2.5 bg-brand-primary text-white text-sm font-semibold rounded-xl hover:bg-brand-primary-hover transition-colors"
+            >
+              View Assignment
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}

@@ -1,0 +1,619 @@
+import { useState } from "react";
+import { Settings, Monitor, BookOpen, Wrench } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
+type ViewMode = "Day" | "Week" | "Month";
+type SessionType = "AM" | "PM" | "Full" | "Hr" | "Ad";
+type BookingStatus = "Completed" | "Ongoing" | "Upcoming";
+
+interface WeekCell {
+  type: SessionType;
+  status: BookingStatus;
+}
+
+interface DayBooking {
+  station: string;
+  unitName: string;
+  sessionType: SessionType;
+  startHour: number; // 0-based from 7AM (so 0=7AM, 1=8AM, ...)
+  durationHours: number;
+  status: BookingStatus;
+  timeLabel: string;
+}
+
+// ── Mock Data ─────────────────────────────────────────────────────────────────
+const STATIONS = ["IMT-01", "IMT-02", "IMT-03", "IMT-04", "IMT-05", "IMT-06"];
+
+const weekData: Record<string, Record<string, WeekCell[]>> = {
+  "IMT-01": {
+    Mon: [{ type: "Full", status: "Completed" }],
+    Tue: [{ type: "AM", status: "Upcoming" }, { type: "PM", status: "Upcoming" }],
+    Wed: [{ type: "AM", status: "Ongoing" }, { type: "PM", status: "Ongoing" }],
+    Thu: [{ type: "Full", status: "Upcoming" }],
+    Fri: [{ type: "AM", status: "Upcoming" }],
+    Sat: [],
+    Sun: [],
+  },
+  "IMT-02": {
+    Mon: [{ type: "AM", status: "Upcoming" }],
+    Tue: [{ type: "Full", status: "Completed" }],
+    Wed: [{ type: "Full", status: "Ongoing" }],
+    Thu: [{ type: "PM", status: "Upcoming" }],
+    Fri: [{ type: "Full", status: "Completed" }],
+    Sat: [{ type: "AM", status: "Upcoming" }],
+    Sun: [],
+  },
+  "IMT-03": {
+    Mon: [],
+    Tue: [{ type: "Hr", status: "Upcoming" }],
+    Wed: [{ type: "Hr", status: "Ongoing" }, { type: "Hr", status: "Upcoming" }],
+    Thu: [{ type: "AM", status: "Upcoming" }, { type: "PM", status: "Upcoming" }],
+    Fri: [],
+    Sat: [],
+    Sun: [],
+  },
+  "IMT-04": {
+    Mon: [{ type: "Ad", status: "Upcoming" }],
+    Tue: [{ type: "Ad", status: "Upcoming" }],
+    Wed: [{ type: "Ad", status: "Upcoming" }],
+    Thu: [],
+    Fri: [{ type: "PM", status: "Upcoming" }],
+    Sat: [],
+    Sun: [],
+  },
+  "IMT-05": {
+    Mon: [],
+    Tue: [{ type: "AM", status: "Upcoming" }],
+    Wed: [{ type: "AM", status: "Ongoing" }],
+    Thu: [],
+    Fri: [{ type: "Full", status: "Completed" }],
+    Sat: [],
+    Sun: [],
+  },
+  "IMT-06": {
+    Mon: [],
+    Tue: [],
+    Wed: [],
+    Thu: [{ type: "AM", status: "Upcoming" }],
+    Fri: [],
+    Sat: [],
+    Sun: [],
+  },
+};
+
+const weekDailyCounts = [3, 6, 7, 5, 4, 1, 0];
+
+const dayBookings: DayBooking[] = [
+  { station: "IMT-01", unitName: "3 SIR", sessionType: "AM", startHour: 1, durationHours: 4, status: "Completed", timeLabel: "AM · 8:00–12:00 · completed" },
+  { station: "IMT-01", unitName: "1 Guards", sessionType: "PM", startHour: 6, durationHours: 4, status: "Ongoing", timeLabel: "PM · 1:00–5:00 · ongoing" },
+  { station: "IMT-02", unitName: "2 CDO", sessionType: "Full", startHour: 1, durationHours: 9, status: "Ongoing", timeLabel: "Full · 8:00–5:00 · ongoing" },
+  { station: "IMT-03", unitName: "4 SIR", sessionType: "Hr", startHour: 2, durationHours: 2.5, status: "Completed", timeLabel: "Hr · Per hour · completed" },
+  { station: "IMT-03", unitName: "2 PDF", sessionType: "Hr", startHour: 5, durationHours: 2.5, status: "Upcoming", timeLabel: "Hr · Per hour · upcoming" },
+  { station: "IMT-04", unitName: "5 SIR", sessionType: "Ad", startHour: 0, durationHours: 5.5, status: "Ongoing", timeLabel: "Ad · 7 Apr PM → 9 Apr AM · ongoing" },
+  { station: "IMT-05", unitName: "Guards HQ", sessionType: "AM", startHour: 1, durationHours: 4, status: "Completed", timeLabel: "AM · 8:00–12:00 · completed" },
+];
+
+// Month calendar data — bookings per day for April 2026
+const aprilBookings: Record<number, number> = {
+  1: 3, 2: 5, 3: 4, 4: 2, 5: 6,
+  8: 1, 9: 7, 10: 3, 11: 5, 12: 2,
+  13: 1, 15: 3, 16: 4, 17: 2, 18: 1, 19: 5,
+  22: 2, 23: 3, 24: 4, 25: 1, 26: 3,
+  27: 1, 29: 2, 30: 3,
+};
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+const sessionColors: Record<SessionType, { bg: string; text: string; dot: string }> = {
+  AM: { bg: "bg-blue-50", text: "text-blue-600", dot: "bg-blue-400" },
+  PM: { bg: "bg-orange-50", text: "text-orange-500", dot: "bg-orange-400" },
+  Full: { bg: "bg-green-50", text: "text-green-600", dot: "bg-green-500" },
+  Hr: { bg: "bg-purple-50", text: "text-purple-500", dot: "bg-purple-400" },
+  Ad: { bg: "bg-red-50", text: "text-red-500", dot: "bg-red-400" },
+};
+
+const statusDot: Record<BookingStatus, string> = {
+  Completed: "bg-green-400",
+  Ongoing: "bg-yellow-400",
+  Upcoming: "bg-blue-300",
+};
+
+function getMonthIntensity(count: number): string {
+  if (!count) return "bg-white";
+  if (count <= 2) return "bg-blue-100";
+  if (count <= 4) return "bg-blue-200";
+  return "bg-blue-300";
+}
+
+// ── Top Cards data per view ───────────────────────────────────────────────────
+const TOP_CARDS_DATA: Record<ViewMode, {
+  bookingLabel: string;
+  booking: { total: number; done: number; ongoing: number; awaiting: number };
+  asset: { issued: number; returned: number; pending: number };
+}> = {
+  Day: {
+    bookingLabel: "Today's Bookings",
+    booking: { total: 24, done: 20, ongoing: 8, awaiting: 4 },
+    asset:   { issued: 24, returned: 20, pending: 8 },
+  },
+  Week: {
+    bookingLabel: "This Week's Bookings",
+    booking: { total: 86, done: 62, ongoing: 14, awaiting: 10 },
+    asset:   { issued: 86, returned: 60, pending: 26 },
+  },
+  Month: {
+    bookingLabel: "This Month's Bookings",
+    booking: { total: 312, done: 248, ongoing: 0, awaiting: 64 },
+    asset:   { issued: 312, returned: 280, pending: 32 },
+  },
+};
+
+// ── Sub-components ────────────────────────────────────────────────────────────
+function TopCards({ view }: { view: ViewMode }) {
+  const d = TOP_CARDS_DATA[view];
+  const bookingPct = Math.round((d.booking.done / d.booking.total) * 100);
+  const ongoingPct = Math.round((d.booking.ongoing / d.booking.total) * 100);
+  const awaitingPct = 100 - bookingPct - ongoingPct;
+  const assetPct = Math.round((d.asset.returned / d.asset.issued) * 100);
+  const pendingPct = 100 - assetPct;
+
+  return (
+    <div className="grid grid-cols-2 gap-4 mb-4">
+      {/* Bookings */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{d.bookingLabel}</span>
+          <span className="text-xs font-bold text-green-600">{bookingPct}% done</span>
+        </div>
+        <div className="grid grid-cols-4 gap-4 mb-3">
+          {[
+            { label: "Total",   value: d.booking.total,   color: "text-gray-800" },
+            { label: "Done",    value: d.booking.done,    color: "text-green-600" },
+            { label: "Ongoing", value: d.booking.ongoing, color: "text-yellow-500" },
+            { label: "Awaiting",value: d.booking.awaiting,color: "text-red-500" },
+          ].map(({ label, value, color }) => (
+            <div key={label}>
+              <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+              <p className={cn("text-3xl font-bold", color)}>{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden flex gap-0.5">
+          <div className="bg-green-500 rounded-full transition-all duration-500" style={{ width: `${bookingPct}%` }} />
+          {ongoingPct > 0 && <div className="bg-yellow-400 rounded-full transition-all duration-500" style={{ width: `${ongoingPct}%` }} />}
+          {awaitingPct > 0 && <div className="bg-red-300 rounded-full transition-all duration-500" style={{ width: `${awaitingPct}%` }} />}
+        </div>
+      </div>
+
+      {/* Asset Overview */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Asset Overview</span>
+          <span className="text-xs font-bold text-green-600">{assetPct}% returned</span>
+        </div>
+        <div className="grid grid-cols-3 gap-4 mb-3">
+          {[
+            { label: "Total Issued",    value: d.asset.issued,   color: "text-gray-800" },
+            { label: "Returned",        value: d.asset.returned, color: "text-green-600" },
+            { label: "Pending Return",  value: d.asset.pending,  color: "text-yellow-500" },
+          ].map(({ label, value, color }) => (
+            <div key={label}>
+              <p className="text-xs text-gray-400 mb-0.5">{label}</p>
+              <p className={cn("text-3xl font-bold", color)}>{value}</p>
+            </div>
+          ))}
+        </div>
+        <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden flex gap-0.5">
+          <div className="bg-green-500 rounded-full transition-all duration-500" style={{ width: `${assetPct}%` }} />
+          {pendingPct > 0 && <div className="bg-yellow-400 rounded-full transition-all duration-500" style={{ width: `${pendingPct}%` }} />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TeamBar() {
+  const roles = [
+    { label: "ADMIN",      count: 3, color: "text-brand-primary", Icon: Settings, bg: "bg-brand-primary/10 border-brand-primary/20" },
+    { label: "OPERATOR",   count: 3, color: "text-blue-700",      Icon: Monitor,  bg: "bg-blue-50 border-blue-200"                    },
+    { label: "INSTRUCTOR", count: 3, color: "text-purple-700",    Icon: BookOpen, bg: "bg-purple-50 border-purple-200"                },
+    { label: "MAINTAINER", count: 3, color: "text-amber-700",     Icon: Wrench,   bg: "bg-amber-50 border-amber-200"                  },
+  ];
+  return (
+    <div className="bg-white rounded-xl border border-gray-200 px-5 py-3 mb-4 flex items-center gap-4">
+      <div className="flex items-center gap-2 mr-2">
+        <span className="text-xs font-semibold text-gray-500">TEAM</span>
+        <span className="text-sm font-bold text-gray-800">12</span>
+      </div>
+      <div className="flex-1 grid grid-cols-4 gap-3">
+        {roles.map(({ label, count, color, Icon, bg }) => (
+          <div key={label} className={cn("flex items-center justify-between px-4 py-2 rounded-lg border", bg)}>
+            <div className="flex items-center gap-2">
+              <Icon size={13} className={color} />
+              <span className={cn("text-xs font-bold", color)}>{label}</span>
+            </div>
+            <span className={cn("text-sm font-bold", color)}>{count}</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+// ── Week View ─────────────────────────────────────────────────────────────────
+const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+const WEEK_DATES = [7, 8, 9, 10, 11, 12, 13];
+const TODAY_IDX = 2; // Wed 9
+
+function WeekView() {
+  const [activeFilters, setActiveFilters] = useState<SessionType[]>(["AM", "PM", "Full", "Hr", "Ad"]);
+
+  const toggleFilter = (t: SessionType) =>
+    setActiveFilters((prev) =>
+      prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
+    );
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Week Overview</span>
+          <span className="text-xs text-gray-400">7–13 Apr 2026</span>
+        </div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-3 text-xs text-gray-500">
+            {(["Completed", "Ongoing", "Upcoming"] as BookingStatus[]).map((s) => (
+              <div key={s} className="flex items-center gap-1.5">
+                <div className={cn("w-2.5 h-2.5 rounded-sm", s === "Completed" ? "bg-green-200" : s === "Ongoing" ? "bg-yellow-200" : "bg-blue-200")} />
+                <span>{s}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Filters */}
+      <div className="flex items-center gap-2 px-5 py-2.5 border-b border-gray-100">
+        {(["AM", "PM", "Full", "Hr", "Ad"] as SessionType[]).map((t) => {
+          const c = sessionColors[t];
+          const active = activeFilters.includes(t);
+          return (
+            <button key={t} onClick={() => toggleFilter(t)}
+              className={cn("flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold border transition-colors",
+                active ? `${c.bg} ${c.text} border-transparent` : "bg-white text-gray-400 border-gray-200")}>
+              <div className={cn("w-2 h-2 rounded-full", active ? c.dot : "bg-gray-300")} />
+              {t === "Hr" ? "Hr" : t === "Ad" ? "Ad" : t}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Grid */}
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[800px]">
+          <thead>
+            <tr>
+              <th className="w-24 px-4 py-2" />
+              {WEEK_DAYS.map((day, i) => (
+                <th key={day} className={cn("py-2 text-center", i === TODAY_IDX ? "bg-blue-50" : "")}>
+                  <div className={cn("text-xs font-medium", i === TODAY_IDX ? "text-blue-600" : "text-gray-500")}>
+                    {day} {WEEK_DATES[i]}
+                  </div>
+                  {i === TODAY_IDX && <div className="text-[10px] text-blue-400">Today</div>}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {STATIONS.map((station, si) => {
+              const stationBookings = Object.values(weekData[station] ?? {}).flat().length;
+              return (
+                <tr key={station} className={cn("border-t border-gray-50", si % 2 === 0 ? "" : "")}>
+                  <td className="px-4 py-3 text-left">
+                    <div className="text-xs font-bold text-gray-700">{station}</div>
+                    <div className="text-[10px] text-gray-400">{stationBookings} bookings</div>
+                  </td>
+                  {WEEK_DAYS.map((day, di) => {
+                    const cells = (weekData[station]?.[day] ?? []).filter((c) => activeFilters.includes(c.type));
+                    return (
+                      <td key={day} className={cn("px-1.5 py-2 align-top", di === TODAY_IDX ? "bg-blue-50/40" : "")}>
+                        {cells.length === 0 ? (
+                          <div className="h-8 flex items-center justify-center text-gray-200 text-xs">–</div>
+                        ) : (
+                          <div className="flex flex-col gap-1">
+                            {cells.map((cell, ci) => {
+                              const c = sessionColors[cell.type];
+                              return (
+                                <div key={ci} className={cn("flex items-center gap-1.5 px-2 py-1.5 rounded-md text-xs font-semibold", c.bg, c.text)}>
+                                  <span>{cell.type}</span>
+                                  <div className={cn("w-1.5 h-1.5 rounded-full ml-auto", statusDot[cell.status])} />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+            {/* Daily totals */}
+            <tr className="border-t border-gray-100 bg-gray-50">
+              <td className="px-4 py-2 text-xs font-semibold text-gray-500">Daily</td>
+              {weekDailyCounts.map((count, i) => (
+                <td key={i} className={cn("py-2 text-center text-sm font-bold", i === TODAY_IDX ? "bg-blue-100/50 text-blue-600" : "text-gray-700")}>
+                  {count}
+                </td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ── Day View ──────────────────────────────────────────────────────────────────
+const HOURS = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18];
+const CURRENT_HOUR = 16.5; // 4:30 PM → offset from 7AM = 9.5
+
+function DayView() {
+  const sessionPills = [
+    { label: "AM Session", time: "8:00–12:00", count: 2, type: "AM" as SessionType },
+    { label: "PM Session", time: "1:00–5:00", count: 1, type: "PM" as SessionType },
+    { label: "Full Day", time: "8:00–5:00", count: 1, type: "Full" as SessionType },
+    { label: "Hourly", time: "Per hour", count: 2, type: "Hr" as SessionType },
+    { label: "Adhoc", time: "Cross-period", count: 1, type: "Ad" as SessionType },
+  ];
+
+  const totalHours = HOURS.length; // 12 columns (7AM–6PM)
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Day Schedule</span>
+          <span className="text-xs text-gray-400">1 booking = entire station (15 lanes)</span>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          {(["Completed", "Ongoing", "Upcoming"] as BookingStatus[]).map((s) => (
+            <div key={s} className="flex items-center gap-1.5">
+              <div className={cn("w-2.5 h-2.5 rounded-sm", s === "Completed" ? "bg-green-200" : s === "Ongoing" ? "bg-yellow-200" : "bg-blue-200")} />
+              <span>{s}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Session pills */}
+      <div className="flex items-center gap-2 px-5 py-2.5 border-b border-gray-100 flex-wrap">
+        {sessionPills.map(({ label, time, count, type }) => {
+          const c = sessionColors[type];
+          return (
+            <div key={type} className={cn("flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border", c.bg, c.text, "border-transparent")}>
+              <div className={cn("w-2 h-2 rounded-full", c.dot)} />
+              <span>{label}</span>
+              <span className="text-gray-400 font-normal">{time}</span>
+              <span className={cn("ml-1 font-bold", c.text)}>{count}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Timeline grid */}
+      <div className="overflow-x-auto">
+        <div className="min-w-[900px] relative">
+          {/* Hour labels */}
+          <div className="flex border-b border-gray-100">
+            <div className="w-28 flex-shrink-0" />
+            {HOURS.map((h) => (
+              <div key={h} className="flex-1 text-center text-xs text-gray-400 py-2 border-l border-gray-50">
+                {h <= 12 ? `${h}AM` : `${h - 12}PM`}
+              </div>
+            ))}
+          </div>
+
+          {/* Current time overlay — full column height */}
+          <div className="absolute top-0 bottom-0 z-20 pointer-events-none"
+            style={{ left: `calc(112px + ${((CURRENT_HOUR - 7) / totalHours) * (100)}%)` }}>
+            <div className="absolute top-0 -translate-x-1/2 bg-red-500 text-white text-[9px] font-bold px-1 py-0.5 rounded leading-tight text-center">
+              4:30<br />PM
+            </div>
+            <div className="absolute top-6 bottom-0 left-1/2 -translate-x-1/2 border-l-2 border-dashed border-red-400" />
+          </div>
+
+          {/* Station rows */}
+          {STATIONS.map((station) => {
+            const stationBookings = dayBookings.filter((b) => b.station === station);
+            return (
+              <div key={station} className="flex border-b border-gray-50" style={{ minHeight: 64 }}>
+                {/* Station label */}
+                <div className="w-28 flex-shrink-0 px-3 py-3">
+                  <div className="text-xs font-bold text-gray-700">{station}</div>
+                  <div className="text-[10px] text-gray-400">15 lanes</div>
+                </div>
+
+                {/* Timeline area */}
+                <div className="flex-1 relative">
+                  {/* Hour grid lines */}
+                  {HOURS.map((_, i) => (
+                    <div key={i} className="absolute top-0 bottom-0 border-l border-gray-50" style={{ left: `${(i / totalHours) * 100}%` }} />
+                  ))}
+
+                  {/* Bookings */}
+                  {stationBookings.length === 0 ? (
+                    <div className="absolute inset-0 flex items-center justify-center text-xs text-gray-300">Available</div>
+                  ) : (
+                    stationBookings.map((b, bi) => {
+                      const left = (b.startHour / totalHours) * 100;
+                      const width = (b.durationHours / totalHours) * 100;
+                      const c = sessionColors[b.sessionType];
+                      const topOffset = bi * 28;
+                      return (
+                        <div key={bi}
+                          className={cn("absolute rounded-md px-2 py-1.5 text-xs font-semibold flex items-center gap-1.5", c.bg, c.text)}
+                          style={{ left: `${left}%`, width: `${width}%`, top: topOffset + 8, minHeight: 24 }}>
+                          <div className={cn("w-1.5 h-1.5 rounded-full flex-shrink-0", statusDot[b.status])} />
+                          <div className="min-w-0">
+                            <div className="font-bold truncate">{b.unitName}</div>
+                            <div className="text-[10px] font-normal opacity-70 truncate">{b.timeLabel}</div>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Month View ────────────────────────────────────────────────────────────────
+function MonthView() {
+  const totalBookings = Object.values(aprilBookings).reduce((a, b) => a + b, 0);
+  const weekendDays = [5, 6, 12, 13, 19, 20, 26]; // Sat/Sun
+  const weekendBookings = weekendDays.reduce((sum, d) => sum + (aprilBookings[d] ?? 0), 0);
+  const weekdayBookings = totalBookings - weekendBookings;
+  const busiest = Object.entries(aprilBookings).reduce((a, b) => (b[1] > a[1] ? b : a), ["0", 0]);
+  const avg = (totalBookings / 30).toFixed(1);
+
+  // April 2026 starts on Wednesday (day index 2)
+  const startDayOfWeek = 2;
+  const daysInMonth = 30;
+  const today = 30; // Apr 30 2026
+
+  const calendarDays: (number | null)[] = [
+    ...Array(startDayOfWeek).fill(null),
+    ...Array.from({ length: daysInMonth }, (_, i) => i + 1),
+  ];
+  while (calendarDays.length % 7 !== 0) calendarDays.push(null);
+
+  const weeks: (number | null)[][] = [];
+  for (let i = 0; i < calendarDays.length; i += 7) weeks.push(calendarDays.slice(i, i + 7));
+
+  return (
+    <div className="bg-white rounded-xl border border-gray-200">
+      {/* Header */}
+      <div className="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">April 2026</span>
+          <span className="text-xs text-gray-400">{totalBookings} bookings · avg {avg}/day</span>
+        </div>
+        <div className="flex items-center gap-4 text-xs text-gray-500">
+          {[
+            { label: "Low", color: "bg-blue-100" },
+            { label: "Medium", color: "bg-blue-200" },
+            { label: "High", color: "bg-blue-300" },
+          ].map(({ label, color }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className={cn("w-3 h-3 rounded-sm border border-gray-200", color)} />
+              <span>{label}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-5 gap-0 border-b border-gray-100">
+        {[
+          { label: "TOTAL BOOKINGS", value: totalBookings.toString(), color: "text-gray-800" },
+          { label: "WEEKDAY", value: weekdayBookings.toString(), color: "text-blue-600" },
+          { label: "WEEKEND", value: weekendBookings.toString(), color: "text-purple-600" },
+          { label: "BUSIEST DAY", value: `${busiest[0]} Apr (${busiest[1]})`, color: "text-yellow-600" },
+          { label: "AVG/DAY", value: avg, color: "text-green-600" },
+        ].map(({ label, value, color }) => (
+          <div key={label} className="px-5 py-4 border-r border-gray-100 last:border-r-0">
+            <div className="text-[10px] font-semibold text-gray-400 uppercase tracking-wide mb-1">{label}</div>
+            <div className={cn("text-2xl font-bold", color)}>{value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar */}
+      <div className="p-4">
+        {/* Day headers */}
+        <div className="grid grid-cols-7 mb-1">
+          {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
+            <div key={d} className="text-center text-xs font-semibold text-gray-400 py-1">{d}</div>
+          ))}
+        </div>
+
+        {/* Weeks */}
+        {weeks.map((week, wi) => (
+          <div key={wi} className="grid grid-cols-7 gap-1 mb-1">
+            {week.map((day, di) => {
+              if (!day) return <div key={di} className="h-20" />;
+              const count = aprilBookings[day] ?? 0;
+              const isToday = day === today;
+              return (
+                <div key={di} className={cn(
+                  "h-20 rounded-lg p-2 border transition-colors cursor-pointer hover:opacity-80",
+                  getMonthIntensity(count),
+                  isToday ? "border-blue-400 ring-1 ring-blue-300" : "border-gray-100",
+                )}>
+                  <div className="flex items-start justify-between">
+                    <span className={cn("text-xs font-semibold", isToday ? "text-blue-600" : "text-gray-600")}>
+                      {day}
+                      {isToday && <span className="ml-1 text-[9px] text-blue-400">TODAY</span>}
+                    </span>
+                  </div>
+                  {count > 0 && (
+                    <div className="mt-auto pt-2">
+                      <span className="text-[10px] text-gray-500">{count} bookings</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        ))}
+      </div>
+
+      {/* Insight bar */}
+      <div className="mx-4 mb-4 px-4 py-2.5 bg-yellow-50 border border-yellow-100 rounded-lg">
+        <span className="text-yellow-500 mr-2">⚡</span>
+        <span className="text-xs text-gray-600">
+          April peak: 9 Apr with 7 bookings. Weekend utilization at 32% — consider opening more weekend slots if demand exists.
+        </span>
+      </div>
+    </div>
+  );
+}
+
+// ── Dashboard ─────────────────────────────────────────────────────────────────
+export function Dashboard() {
+  const [view, setView] = useState<ViewMode>("Week");
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-4 md:p-6">
+        {/* View Toggle */}
+        <div className="flex justify-end mb-4">
+          <div className="flex bg-white border border-gray-200 rounded-lg overflow-hidden shadow-sm">
+            {(["Day", "Week", "Month"] as ViewMode[]).map((v) => (
+              <button key={v} onClick={() => setView(v)}
+                className={cn("px-5 py-2 text-sm font-semibold transition-colors",
+                  view === v ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-700")}>
+                {v}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <TopCards view={view} />
+        <TeamBar />
+
+        {view === "Week" && <WeekView />}
+        {view === "Day" && <DayView />}
+        {view === "Month" && <MonthView />}
+      </div>
+    </div>
+  );
+}

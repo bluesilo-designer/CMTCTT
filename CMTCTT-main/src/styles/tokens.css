@@ -1,0 +1,144 @@
+/*
+ * Design Tokens — CSS Custom Properties
+ *
+ * This file is generated from docs/design-tokens.json (via Tokens Studio export).
+ * Edit the JSON tokens in Figma, export, then paste the updated values here.
+ * Tailwind reads these variables from tailwind.config.ts.
+ *
+ * Layer order:  Brand → Primitive → Semantic
+ */
+
+:root {
+  /* ── Brand ─────────────────────────────────────────────────── */
+  --color-brand-primary:       #7A1515;
+  --color-brand-primary-hover: #8B1A1A;
+  --color-brand-navy:          #1A3A6B;
+  --color-brand-bluesilo:      #0047AB;
+
+  /* ── Primitive · Red ────────────────────────────────────────── */
+  --color-red-50:  #FEF2F2;
+  --color-red-100: #FEE2E2;
+  --color-red-200: #FECACA;
+  --color-red-300: #FCA5A5;
+  --color-red-400: #F87171;
+  --color-red-500: #EF4444;
+  --color-red-600: #DC2626;
+  --color-red-700: #B91C1C;
+  --color-red-800: #8B1A1A;
+  --color-red-900: #7A1515;
+  --color-red-950: #450A0A;
+
+  /* ── Primitive · Gray ───────────────────────────────────────── */
+  --color-gray-50:  #F9FAFB;
+  --color-gray-100: #F3F4F6;
+  --color-gray-200: #E5E7EB;
+  --color-gray-300: #D1D5DB;
+  --color-gray-400: #9CA3AF;
+  --color-gray-500: #6B7280;
+  --color-gray-600: #4B5563;
+  --color-gray-700: #374151;
+  --color-gray-800: #1F2937;
+  --color-gray-900: #111827;
+  --color-gray-950: #030712;
+
+  /* ── Primitive · Green ──────────────────────────────────────── */
+  --color-green-50:  #F0FDF4;
+  --color-green-100: #DCFCE7;
+  --color-green-200: #BBF7D0;
+  --color-green-300: #86EFAC;
+  --color-green-400: #4ADE80;
+  --color-green-500: #22C55E;
+  --color-green-600: #16A34A;
+  --color-green-700: #15803D;
+  --color-green-800: #166534;
+  --color-green-900: #14532D;
+
+  /* ── Primitive · Yellow ─────────────────────────────────────── */
+  --color-yellow-50:  #FFFBEB;
+  --color-yellow-100: #FEF3C7;
+  --color-yellow-200: #FDE68A;
+  --color-yellow-300: #FCD34D;
+  --color-yellow-400: #FBBF24;
+  --color-yellow-500: #F59E0B;
+  --color-yellow-600: #D97706;
+  --color-yellow-700: #B45309;
+  --color-yellow-800: #92400E;
+  --color-yellow-900: #78350F;
+
+  /* ── Primitive · Blue ───────────────────────────────────────── */
+  --color-blue-50:  #EFF6FF;
+  --color-blue-100: #DBEAFE;
+  --color-blue-200: #BFDBFE;
+  --color-blue-300: #93C5FD;
+  --color-blue-400: #60A5FA;
+  --color-blue-500: #3B82F6;
+  --color-blue-600: #2563EB;
+  --color-blue-700: #1D4ED8;
+  --color-blue-800: #1E40AF;
+  --color-blue-900: #1E3A8A;
+
+  /* ── Primitive · Purple ─────────────────────────────────────── */
+  --color-purple-50:  #FAF5FF;
+  --color-purple-100: #F3E8FF;
+  --color-purple-200: #E9D5FF;
+  --color-purple-500: #A855F7;
+  --color-purple-600: #9333EA;
+  --color-purple-700: #7C3AED;
+  --color-purple-900: #4C1D95;
+
+  /* ── Semantic · Text ────────────────────────────────────────── */
+  --color-content-primary:   var(--color-gray-900);
+  --color-content-secondary: var(--color-gray-700);
+  --color-content-muted:     var(--color-gray-500);
+  --color-content-disabled:  var(--color-gray-300);
+  --color-content-inverse:   #ffffff;
+  --color-content-brand:     var(--color-brand-primary);
+  --color-content-error:     var(--color-red-600);
+  --color-content-success:   var(--color-green-700);
+  --color-content-warning:   var(--color-yellow-700);
+
+  /* ── Semantic · Background ──────────────────────────────────── */
+  --color-surface-page:        var(--color-gray-50);
+  --color-surface:             #ffffff;
+  --color-surface-subtle:      var(--color-gray-100);
+  --color-fill-brand:          var(--color-brand-primary);
+  --color-fill-brand-hover:    var(--color-brand-primary-hover);
+  --color-fill-brand-subtle:   var(--color-red-50);
+  --color-fill-error:          var(--color-red-50);
+  --color-fill-success:        var(--color-green-50);
+  --color-fill-warning:        var(--color-yellow-50);
+  --color-fill-info:           var(--color-blue-50);
+
+  /* ── Semantic · Border ──────────────────────────────────────── */
+  --color-line-default: var(--color-gray-200);
+  --color-line-strong:  var(--color-gray-300);
+  --color-line-muted:   var(--color-gray-100);
+  --color-line-focus:   var(--color-brand-primary);
+  --color-line-brand:   var(--color-brand-primary);
+  --color-line-error:   var(--color-red-500);
+
+  /* ── Semantic · Status ──────────────────────────────────────── */
+  --color-status-upcoming-bg:      var(--color-blue-100);
+  --color-status-upcoming-text:    var(--color-blue-800);
+  --color-status-upcoming-border:  var(--color-blue-200);
+
+  --color-status-ongoing-bg:       var(--color-yellow-100);
+  --color-status-ongoing-text:     var(--color-yellow-800);
+  --color-status-ongoing-border:   var(--color-yellow-300);
+
+  --color-status-return-bg:        var(--color-purple-100);
+  --color-status-return-text:      var(--color-purple-700);
+  --color-status-return-border:    var(--color-purple-200);
+
+  --color-status-completed-bg:     var(--color-green-100);
+  --color-status-completed-text:   var(--color-green-800);
+  --color-status-completed-border: var(--color-green-300);
+
+  --color-status-cancelled-bg:     var(--color-gray-100);
+  --color-status-cancelled-text:   var(--color-gray-600);
+  --color-status-cancelled-border: var(--color-gray-300);
+
+  --color-status-overdue-bg:       var(--color-red-100);
+  --color-status-overdue-text:     var(--color-red-700);
+  --color-status-overdue-border:   var(--color-red-300);
+}

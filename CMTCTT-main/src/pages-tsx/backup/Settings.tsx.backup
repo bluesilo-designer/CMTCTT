@@ -1,0 +1,975 @@
+import { useState, useRef, useEffect } from "react";
+import { Search, Plus, Pencil, Trash2, Building2, CheckCircle2, X, ChevronDown } from "lucide-react";
+import { Pagination } from "@/components/ui/Pagination";
+import { cn } from "@/lib/utils";
+
+// ── Menu ──────────────────────────────────────────────────────────────────────
+const MENU_ITEMS = [
+  "Notification Setting",
+  "Auto-Archive Setting",
+  "IP Whitelisting",
+  "Briefing Room",
+  "Location",
+  "HUMS Interval",
+  "RFID Transition Rules",
+  "Armskote Transition Rules",
+  "Missing Transition Rules",
+  "Individual Booking",
+  "Mask NRIC",
+  "System Version",
+] as const;
+
+type MenuItem = (typeof MENU_ITEMS)[number];
+
+// ── Notification Setting ──────────────────────────────────────────────────────
+type NotifTab = "Booking" | "Asset" | "Training" | "User";
+const BOOKING_OPTIONS = ["New Booking", "Booking Assignment", "Cancel Booking"];
+
+function NotificationSetting() {
+  const [activeTab, setActiveTab] = useState<NotifTab>("Booking");
+  const [enabled, setEnabled] = useState<Record<string, boolean>>({
+    "New Booking": true,
+    "Booking Assignment": true,
+    "Cancel Booking": true,
+  });
+
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-gray-800 mb-4">Notification Setting</h2>
+      <div className="flex border-b border-gray-200 mb-6">
+        {(["Booking", "Asset", "Training", "User"] as NotifTab[]).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={cn(
+              "px-4 py-2.5 text-sm font-medium transition-colors border-b-2 -mb-px",
+              activeTab === tab
+                ? "text-brand-primary border-brand-primary"
+                : "text-gray-400 border-transparent hover:text-gray-600"
+            )}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+      {activeTab === "Booking" ? (
+        <div className="space-y-5">
+          {BOOKING_OPTIONS.map((option) => (
+            <div key={option}>
+              <p className="text-sm font-medium text-gray-700 mb-2">{option}</p>
+              <div className="flex items-center gap-6">
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                  <input type="radio" name={option} checked={enabled[option] === true} onChange={() => setEnabled((p) => ({ ...p, [option]: true }))} className="accent-brand-primary" />
+                  Enable
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer text-sm text-gray-700">
+                  <input type="radio" name={option} checked={enabled[option] === false} onChange={() => setEnabled((p) => ({ ...p, [option]: false }))} className="accent-brand-primary" />
+                  Disable
+                </label>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="py-12 text-center text-gray-400 text-sm">{activeTab} notification settings — coming soon</div>
+      )}
+    </div>
+  );
+}
+
+// ── Auto-Archive Setting ──────────────────────────────────────────────────────
+function AutoArchiveSetting() {
+  const [days, setDays] = useState("30");
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-gray-800 mb-6">Auto Archive Setting</h2>
+      <div className="max-w-sm space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Archive after (days)</label>
+          <input
+            type="number"
+            value={days}
+            onChange={(e) => setDays(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+          />
+        </div>
+        <button className="w-full py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-lg transition-colors">
+          Confirm
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── IP Whitelisting ───────────────────────────────────────────────────────────
+interface IPEntry {
+  id: string;
+  name: string;
+  ipAddress: string;
+  description: string;
+  startIp: string;
+  endIp: string;
+}
+
+const IP_ENTRIES: IPEntry[] = [
+  { id: "ip5", name: "IP Name 5",      ipAddress: "10.10.10.50",    description: "This Is For IP Name 5",        startIp: "10.10.10.1",    endIp: "10.10.10.255"    },
+  { id: "ip4", name: "IP Name 4",      ipAddress: "192.168.100.15", description: "This Is For IP Name 4",        startIp: "192.168.100.1", endIp: "192.168.100.255" },
+  { id: "ip3", name: "IP Name 3",      ipAddress: "172.16.0.20",    description: "This Is For IP Name 3",        startIp: "172.16.0.1",    endIp: "172.16.0.255"    },
+  { id: "ip2", name: "IP Name 2",      ipAddress: "10.0.0.5",       description: "This Is For IP Name 2",        startIp: "10.0.0.1",      endIp: "10.0.0.255"      },
+  { id: "ip1", name: "IP Name 1",      ipAddress: "192.168.1.10",   description: "This Is For IP Name 1",        startIp: "192.168.1.1",   endIp: "192.168.1.255"   },
+  { id: "ip0", name: "All IP Address", ipAddress: "0.0.0.0",        description: "Access For All IP Address",    startIp: "0.0.0.0",       endIp: "255.255.255.255" },
+];
+
+const PER_PAGE = 10;
+
+function IPWhitelisting() {
+  const [search, setSearch] = useState("");
+  const [enabled, setEnabled] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const selectAllRef = useRef<HTMLInputElement>(null);
+
+  const filtered = IP_ENTRIES.filter(
+    (e) => !search || e.name.toLowerCase().includes(search.toLowerCase()) || e.ipAddress.includes(search)
+  );
+  const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
+  const allSelected = paginated.length > 0 && paginated.every((e) => selected.has(e.id));
+  const someSelected = paginated.some((e) => selected.has(e.id));
+
+  useEffect(() => {
+    if (selectAllRef.current) {
+      selectAllRef.current.indeterminate = someSelected && !allSelected;
+    }
+  }, [someSelected, allSelected]);
+
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(paginated.map((e) => e.id)));
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  const deleteSelected = () => setSelected(new Set());
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-gray-800">
+          IP Whitelisting <span className="text-gray-400 font-normal">({IP_ENTRIES.length} Devices)</span>
+        </h2>
+        <div className="flex items-center gap-2">
+          {selected.size > 0 && (
+            <button
+              onClick={deleteSelected}
+              className="flex items-center gap-1.5 px-4 py-2 bg-red-500 hover:bg-red-600 text-white text-sm font-semibold rounded-lg transition-colors"
+            >
+              <Trash2 size={14} />
+              Delete ({selected.size})
+            </button>
+          )}
+          <button className="flex items-center gap-1.5 px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-lg transition-colors">
+            <Plus size={15} />
+            Add IP
+          </button>
+        </div>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between mb-4">
+        <div className="relative">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md w-56 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+          />
+        </div>
+        <div className="flex items-center gap-2 text-sm">
+          <label className="flex items-center gap-1.5 cursor-pointer text-gray-600">
+            <input
+              type="radio"
+              name="ip-status"
+              checked={enabled}
+              onChange={() => setEnabled(true)}
+              className="accent-brand-primary"
+            />
+            Enable
+          </label>
+          <label className="flex items-center gap-1.5 cursor-pointer text-gray-600">
+            <input
+              type="radio"
+              name="ip-status"
+              checked={!enabled}
+              onChange={() => setEnabled(false)}
+              className="accent-brand-primary"
+            />
+            Disable
+          </label>
+        </div>
+      </div>
+
+      {/* Table */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-red-50 border-b border-gray-100">
+                <th className="px-4 py-3 w-10">
+                  <input
+                    ref={selectAllRef}
+                    type="checkbox"
+                    checked={allSelected}
+                    onChange={toggleAll}
+                    className="rounded border-gray-300 accent-brand-primary"
+                  />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">Name</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">IP Address</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[200px]">Description</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[240px]" colSpan={2}>
+                  IP Range
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-20">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((entry) => (
+                <tr
+                  key={entry.id}
+                  className={cn(
+                    "border-b border-gray-50 hover:bg-gray-50 transition-colors",
+                    selected.has(entry.id) && "bg-red-50/30"
+                  )}
+                >
+                  <td className="px-4 py-3.5">
+                    <input
+                      type="checkbox"
+                      checked={selected.has(entry.id)}
+                      onChange={() => toggleOne(entry.id)}
+                      className="rounded border-gray-300 accent-brand-primary"
+                    />
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-gray-800 font-medium">{entry.name}</td>
+                  <td className="px-4 py-3.5 text-sm text-gray-700">{entry.ipAddress}</td>
+                  <td className="px-4 py-3.5 text-sm text-gray-700">{entry.description}</td>
+                  <td className="px-4 py-3.5 text-sm text-gray-600 min-w-[120px]">
+                    <div className="text-xs text-gray-400 mb-0.5">Start IP</div>
+                    <div>{entry.startIp}</div>
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-gray-600 min-w-[120px]">
+                    <div className="text-xs text-gray-400 mb-0.5">End IP</div>
+                    <div>{entry.endIp}</div>
+                  </td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <button className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-red-50 rounded transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Pagination
+          current={currentPage}
+          total={totalPages}
+          perPage={PER_PAGE}
+          totalItems={filtered.length}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+    </div>
+  );
+}
+
+// ── Briefing Room ─────────────────────────────────────────────────────────────
+interface RoomEntry {
+  id: string;
+  name: string;
+  status: "Active" | "Inactive";
+  description: string;
+}
+
+const BRIEFING_ROOMS: RoomEntry[] = [
+  { id: "br2", name: "Briefing Room 2", status: "Active", description: "For Station 2" },
+  { id: "br1", name: "Briefing Room 1", status: "Active", description: "For Station 1" },
+];
+
+const LOCATIONS: RoomEntry[] = [
+  { id: "loc1", name: "Operator Room",   status: "Active", description: "For Operator Room"   },
+  { id: "loc2", name: "Maintainer Room", status: "Active", description: "For Maintainer Room" },
+  { id: "loc3", name: "Briefing Room 1", status: "Active", description: "For Station 1"       },
+  { id: "loc4", name: "Briefing Room 2", status: "Active", description: "For Station 2"       },
+];
+
+function RoomTable({
+  title,
+  addLabel,
+  rows,
+}: {
+  title: string;
+  addLabel: string;
+  rows: RoomEntry[];
+}) {
+  const [search, setSearch]     = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const selectAllRef = useRef<HTMLInputElement>(null);
+  const PER = 10;
+
+  const filtered   = rows.filter((r) => !search || r.name.toLowerCase().includes(search.toLowerCase()));
+  const paginated  = filtered.slice((currentPage - 1) * PER, currentPage * PER);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER));
+  const allSel     = paginated.length > 0 && paginated.every((r) => selected.has(r.id));
+  const someSel    = paginated.some((r) => selected.has(r.id));
+
+  useEffect(() => {
+    if (selectAllRef.current) selectAllRef.current.indeterminate = someSel && !allSel;
+  }, [someSel, allSel]);
+
+  const toggleAll = () => setSelected(allSel ? new Set() : new Set(paginated.map((r) => r.id)));
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-gray-800">
+          {title} <span className="text-gray-400 font-normal">({rows.length} Rooms)</span>
+        </h2>
+        <button className="flex items-center gap-1.5 px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-lg transition-colors">
+          <Plus size={15} /> {addLabel}
+        </button>
+      </div>
+
+      {/* Search */}
+      <div className="relative mb-3">
+        <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+        <input
+          type="text"
+          placeholder="Search"
+          value={search}
+          onChange={(e) => { setSearch(e.target.value); setCurrentPage(1); }}
+          className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md w-56 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+        />
+      </div>
+
+      {/* Select All + Delete toolbar */}
+      <div className="flex items-center justify-between mb-2 px-1">
+        <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer select-none">
+          <input
+            ref={selectAllRef}
+            type="checkbox"
+            checked={allSel}
+            onChange={toggleAll}
+            className="rounded border-gray-300 accent-brand-primary"
+          />
+          Select All
+        </label>
+        <button
+          disabled={selected.size === 0}
+          onClick={() => setSelected(new Set())}
+          className={cn(
+            "flex items-center gap-1.5 text-sm font-medium transition-colors",
+            selected.size > 0
+              ? "text-red-500 hover:text-red-600"
+              : "text-gray-300 cursor-not-allowed"
+          )}
+        >
+          <Trash2 size={14} /> Delete{selected.size > 0 ? ` (${selected.size})` : ""}
+        </button>
+      </div>
+
+      {/* Table */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-red-50 border-b border-gray-100">
+                <th className="px-5 py-3 text-left text-xs font-semibold text-brand-primary w-14">No</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-brand-primary min-w-[180px]">Name</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-brand-primary min-w-[100px]">Status</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-brand-primary min-w-[200px]">Description</th>
+                <th className="px-5 py-3 text-left text-xs font-semibold text-brand-primary w-24">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((row, idx) => (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    "border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors",
+                    selected.has(row.id) && "bg-red-50/30"
+                  )}
+                >
+                  <td className="px-5 py-3.5 text-sm text-gray-500">
+                    <div className="flex items-center gap-3">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(row.id)}
+                        onChange={() => toggleOne(row.id)}
+                        className="rounded border-gray-300 accent-brand-primary"
+                      />
+                      {(currentPage - 1) * PER + idx + 1}
+                    </div>
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-gray-800 font-medium">{row.name}</td>
+                  <td className="px-5 py-3.5">
+                    <span className={cn(
+                      "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                      row.status === "Active"
+                        ? "bg-green-100 text-green-700"
+                        : "bg-gray-100 text-gray-500"
+                    )}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-5 py-3.5 text-sm text-gray-600">{row.description}</td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-2">
+                      <button className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-red-50 rounded transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Pagination
+          current={currentPage}
+          total={totalPages}
+          perPage={PER}
+          totalItems={filtered.length}
+          onPageChange={setCurrentPage}
+        />
+      </div>
+    </div>
+  );
+}
+
+function BriefingRoom() {
+  return <RoomTable title="Briefing Room" addLabel="Add Briefing Room" rows={BRIEFING_ROOMS} />;
+}
+
+// ── Location Modal ────────────────────────────────────────────────────────────
+function LocationModal({ mode, initial, onClose, onConfirm }: {
+  mode: "add" | "edit";
+  initial?: RoomEntry;
+  onClose: () => void;
+  onConfirm: (entry: Omit<RoomEntry, "id">) => void;
+}) {
+  const [name, setName] = useState(initial?.name ?? "");
+  const [status, setStatus] = useState<"Active" | "Inactive">(initial?.status ?? "Active");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [nameError, setNameError] = useState(false);
+  const [statusOpen, setStatusOpen] = useState(false);
+  const statusRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (statusRef.current && !statusRef.current.contains(e.target as Node)) setStatusOpen(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const handleConfirm = () => {
+    if (!name.trim()) { setNameError(true); return; }
+    onConfirm({ name: name.trim(), status, description });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <Building2 size={20} className="text-brand-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">{mode === "add" ? "Add Location" : "Edit Location"}</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Please fill all the information.</p>
+          </div>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          {/* Name */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Name <span className="text-brand-primary">*</span>
+            </label>
+            <input
+              type="text"
+              value={name}
+              autoFocus
+              onChange={e => { setName(e.target.value); if (e.target.value.trim()) setNameError(false); }}
+              placeholder="Enter location name (e.g, location 1,etc)"
+              className={cn("w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary",
+                nameError ? "border-red-500" : "border-gray-200")}
+            />
+            {nameError && <p className="mt-1 text-xs text-red-500">Name is required</p>}
+          </div>
+
+          {/* Status */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Status <span className="text-brand-primary">*</span>
+            </label>
+            <div className="relative" ref={statusRef}>
+              <button type="button" onClick={() => setStatusOpen(o => !o)}
+                className="w-full flex items-center justify-between px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-1 focus:ring-brand-primary">
+                <span className="text-gray-800">{status}</span>
+                <ChevronDown size={14} className={cn("text-gray-400 transition-transform", statusOpen && "rotate-180")} />
+              </button>
+              {statusOpen && (
+                <div className="absolute z-10 mt-1 w-full bg-white border border-gray-200 rounded-lg shadow-lg overflow-hidden">
+                  {(["Active", "Inactive"] as const).map(opt => (
+                    <button key={opt} type="button" onClick={() => { setStatus(opt); setStatusOpen(false); }}
+                      className={cn("w-full text-left px-3 py-2.5 text-sm hover:bg-gray-50",
+                        status === opt ? "text-brand-primary font-medium" : "text-gray-700")}>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Description */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+            <textarea
+              value={description}
+              onChange={e => setDescription(e.target.value)}
+              placeholder="Enter description"
+              rows={3}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary resize-none"
+            />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={handleConfirm}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LocationSetting() {
+  const [rows, setRows] = useState<RoomEntry[]>(LOCATIONS);
+  const [search, setSearch] = useState("");
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editTarget, setEditTarget] = useState<RoomEntry | null>(null);
+  const PER = 10;
+
+  const filtered = rows.filter(r => !search || r.name.toLowerCase().includes(search.toLowerCase()));
+  const paginated = filtered.slice((currentPage - 1) * PER, currentPage * PER);
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PER));
+  const allSel = paginated.length > 0 && paginated.every(r => selected.has(r.id));
+  const someSel = paginated.some(r => selected.has(r.id));
+  const toggleAll = () => setSelected(allSel ? new Set() : new Set(paginated.map(r => r.id)));
+  const toggleOne = (id: string) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const handleAdd = (entry: Omit<RoomEntry, "id">) => {
+    setRows(prev => [...prev, { ...entry, id: `loc-${Date.now()}` }]);
+  };
+  const handleEdit = (entry: Omit<RoomEntry, "id">) => {
+    if (!editTarget) return;
+    setRows(prev => prev.map(r => r.id === editTarget.id ? { ...r, ...entry } : r));
+  };
+  const handleDelete = (id: string) => setRows(prev => prev.filter(r => r.id !== id));
+  const handleDeleteSelected = () => { setRows(prev => prev.filter(r => !selected.has(r.id))); setSelected(new Set()); };
+
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-base font-semibold text-gray-800">
+          Location <span className="text-gray-400 font-normal">({rows.length} Rooms)</span>
+        </h2>
+        <button onClick={() => setShowAdd(true)}
+          className="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-lg transition-colors">
+          Add Location
+        </button>
+      </div>
+
+      {/* Toolbar */}
+      <div className="flex items-center justify-between mb-3">
+        <div className="relative">
+          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input type="text" placeholder="Search" value={search}
+            onChange={e => { setSearch(e.target.value); setCurrentPage(1); }}
+            className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md w-56 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary" />
+        </div>
+        {selected.size > 0 && (
+          <button onClick={handleDeleteSelected}
+            className="flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-600">
+            <Trash2 size={14} /> Delete
+          </button>
+        )}
+      </div>
+
+      {/* Table */}
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-red-50 border-b border-gray-100">
+                <th className="px-4 py-3 w-10">
+                  <input type="checkbox" checked={allSel}
+                    ref={el => { if (el) el.indeterminate = someSel && !allSel; }}
+                    onChange={toggleAll} className="rounded border-gray-300 accent-brand-primary" />
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-12">No</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[160px]">Name</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[100px]">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[200px]">
+                  <span className="flex items-center gap-1"><Search size={12} className="text-gray-400" /> Description</span>
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-24">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map((row, idx) => (
+                <tr key={row.id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors">
+                  <td className="px-4 py-3.5">
+                    <input type="checkbox" checked={selected.has(row.id)} onChange={() => toggleOne(row.id)}
+                      className="rounded border-gray-300 accent-brand-primary" />
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-gray-500">{(currentPage - 1) * PER + idx + 1}</td>
+                  <td className="px-4 py-3.5 text-sm text-gray-800 font-medium">{row.name}</td>
+                  <td className="px-4 py-3.5">
+                    <span className={cn("inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium",
+                      row.status === "Active" ? "bg-green-100 text-green-700" : "bg-gray-100 text-gray-500")}>
+                      {row.status}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3.5 text-sm text-gray-600">{row.description}</td>
+                  <td className="px-4 py-3.5">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditTarget(row)}
+                        className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-red-50 rounded transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(row.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Pagination current={currentPage} total={totalPages} perPage={PER} totalItems={filtered.length} onPageChange={setCurrentPage} />
+      </div>
+
+      {showAdd && <LocationModal mode="add" onClose={() => setShowAdd(false)} onConfirm={handleAdd} />}
+      {editTarget && <LocationModal mode="edit" initial={editTarget} onClose={() => setEditTarget(null)} onConfirm={handleEdit} />}
+    </div>
+  );
+}
+
+// ── HUMS Interval ─────────────────────────────────────────────────────────────
+function HUMSInterval() {
+  const [value, setValue] = useState("30");
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-gray-800 mb-6">HUMS Interval</h2>
+      <div className="max-w-sm space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">HUMS Interval (seconds)</label>
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+          />
+        </div>
+        <button className="w-full py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-lg transition-colors">
+          Confirm
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── Transition Rule form (shared) ─────────────────────────────────────────────
+function TransitionRuleForm({ title, defaultValue }: { title: string; defaultValue: string }) {
+  const [value, setValue] = useState(defaultValue);
+  return (
+    <div>
+      <h2 className="text-base font-semibold text-gray-800 mb-6">{title}</h2>
+      <div className="max-w-sm space-y-5">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-2">Transition Time (seconds)</label>
+          <input
+            type="number"
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            className="w-full border border-gray-200 rounded-lg px-3 py-2.5 text-sm text-gray-800 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+          />
+        </div>
+        <button className="w-full py-2.5 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-lg transition-colors">
+          Confirm
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── System Version ────────────────────────────────────────────────────────────
+interface VersionEntry {
+  id: string;
+  version: string;
+  date: string;
+  patchNotes: string[];
+}
+
+const INITIAL_VERSIONS: VersionEntry[] = [
+  { id: "v15", version: "0.6.9-21", date: "06 May 2026\n11:09:00 PM", patchNotes: ["Release With Major Bug Fixing And Feature Adjustment"] },
+  { id: "v14", version: "0.6.9-20", date: "05 May 2026\n09:30:00 PM", patchNotes: ["Release With Major Bug Fixing And Feature Adjustment"] },
+  { id: "v13", version: "0.6.9-19", date: "03 May 2026\n08:00:00 PM", patchNotes: ["Release With Bug Fixing And Feature Adjustment"] },
+  { id: "v12", version: "0.6.9-18", date: "01 May 2026\n06:45:00 PM", patchNotes: ["Release With Bug Fixing And Feature Adjustment"] },
+  { id: "v11", version: "0.6.9-17", date: "29 Apr 2026\n05:20:00 PM", patchNotes: ["Release With Bug Fixing And Feature Adjustment"] },
+  { id: "v10", version: "0.6.9-15", date: "26 Apr 2026\n04:00:00 PM", patchNotes: ["Release With Bug Fixing And Feature Adjustment"] },
+  { id: "v9",  version: "0.6.9-14", date: "24 Apr 2026\n03:10:00 PM", patchNotes: ["Release"] },
+  { id: "v8",  version: "0.6.9-4",  date: "20 Apr 2026\n02:30:00 PM", patchNotes: ["Release"] },
+  { id: "v7",  version: "0.4.3",    date: "15 Nov 2025\n04:25:14 PM", patchNotes: ["Final PD Release With Bug Fixing"] },
+  { id: "v6",  version: "0.4.2",    date: "09 Oct 2025\n03:10:56 PM", patchNotes: ["Third PD Release With Bug Fixing"] },
+  { id: "v5",  version: "0.4.1",    date: "30 Sep 2025\n12:10:27 PM", patchNotes: ["Second PD Release With Bug Fixing"] },
+  { id: "v4",  version: "0.4.0",    date: "13 Sep 2025\n07:34:47 PM", patchNotes: ["First PD Release"] },
+];
+
+function AddVersionModal({ onClose, onAdd }: { onClose: () => void; onAdd: (v: Omit<VersionEntry, "id">) => void }) {
+  const [version, setVersion] = useState("");
+  const [notes, setNotes] = useState("");
+
+  const handleConfirm = () => {
+    if (!version.trim()) return;
+    const now = new Date();
+    const date = now.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" })
+      + "\n" + now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    const patchNotes = notes.split(",").map(n => n.trim()).filter(Boolean);
+    onAdd({ version: version.trim(), date, patchNotes: patchNotes.length ? patchNotes : ["Release"] });
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-start gap-4">
+            <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+              <CheckCircle2 size={20} className="text-green-500" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-gray-900">Add System Version</h2>
+              <p className="text-sm text-gray-500 mt-0.5">Please fill all the information.</p>
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="space-y-4 mb-6">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Version</label>
+            <input type="text" value={version} autoFocus onChange={e => setVersion(e.target.value)}
+              placeholder="Enter version name (e.g, 0.1.1)"
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Patch Notes (Comma Separated)</label>
+            <textarea value={notes} onChange={e => setNotes(e.target.value)} rows={4}
+              placeholder="Example: Fixed login bug, Added new API endpoint, Improved performance"
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary resize-none" />
+          </div>
+        </div>
+
+        <div className="flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={handleConfirm} disabled={!version.trim()}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover disabled:opacity-40">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function SystemVersion() {
+  const [versions, setVersions] = useState<VersionEntry[]>(INITIAL_VERSIONS);
+  const [showAdd, setShowAdd] = useState(false);
+  const [editTarget, setEditTarget] = useState<VersionEntry | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const VER_PER_PAGE = 10;
+
+  const totalPages = Math.max(1, Math.ceil(versions.length / VER_PER_PAGE));
+  const paginated = versions.slice((currentPage - 1) * VER_PER_PAGE, currentPage * VER_PER_PAGE);
+
+  const handleAdd = (v: Omit<VersionEntry, "id">) => {
+    setVersions(prev => [{ ...v, id: `v-${Date.now()}` }, ...prev]);
+  };
+  const handleDelete = (id: string) => setVersions(prev => prev.filter(v => v.id !== id));
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-base font-semibold text-gray-800">System Version</h2>
+        <button onClick={() => setShowAdd(true)}
+          className="px-4 py-2 bg-brand-primary hover:bg-brand-primary-hover text-white text-sm font-semibold rounded-lg transition-colors">
+          Add Version
+        </button>
+      </div>
+
+      <div className="border border-gray-200 rounded-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-red-50 border-b border-gray-100">
+                <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary w-28">Version</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary w-40">Date</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary">Patch Notes</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-brand-primary w-24">Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {paginated.map(v => (
+                <tr key={v.id} className="border-b border-gray-50 last:border-b-0 hover:bg-gray-50 transition-colors">
+                  <td className="px-5 py-3.5 text-sm font-semibold text-gray-800">{v.version}</td>
+                  <td className="px-5 py-3.5">
+                    <div className="text-sm text-gray-700">{v.date.split("\n")[0]}</div>
+                    <div className="text-xs text-gray-400">{v.date.split("\n")[1]}</div>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <ul className="list-disc list-inside space-y-0.5">
+                      {v.patchNotes.map((note, i) => (
+                        <li key={i} className="text-sm text-gray-700">{note}</li>
+                      ))}
+                    </ul>
+                  </td>
+                  <td className="px-5 py-3.5">
+                    <div className="flex items-center gap-1">
+                      <button onClick={() => setEditTarget(v)}
+                        className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-red-50 rounded transition-colors">
+                        <Pencil size={14} />
+                      </button>
+                      <button onClick={() => handleDelete(v.id)}
+                        className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded transition-colors">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Pagination current={currentPage} total={totalPages} perPage={VER_PER_PAGE} totalItems={versions.length} onPageChange={setCurrentPage} />
+      </div>
+
+      {showAdd && <AddVersionModal onClose={() => setShowAdd(false)} onAdd={handleAdd} />}
+      {editTarget && (
+        <AddVersionModal
+          onClose={() => setEditTarget(null)}
+          onAdd={v => { setVersions(prev => prev.map(e => e.id === editTarget.id ? { ...e, ...v } : e)); setEditTarget(null); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Generic placeholder ───────────────────────────────────────────────────────
+function PlaceholderContent({ title }: { title: string }) {
+  return (
+    <div className="py-16 text-center text-gray-400 text-sm">{title} — coming soon</div>
+  );
+}
+
+// ── Settings page ─────────────────────────────────────────────────────────────
+export function Settings() {
+  const [activeMenu, setActiveMenu] = useState<MenuItem>("Auto-Archive Setting");
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-6">
+        <div className="flex gap-5 items-start">
+          {/* Left nav */}
+          <div className="w-56 flex-shrink-0 bg-white rounded-lg border border-gray-200 py-2">
+            <p className="px-4 py-2 text-sm font-semibold text-gray-800">Settings</p>
+            {MENU_ITEMS.map((item) => (
+              <button
+                key={item}
+                onClick={() => setActiveMenu(item)}
+                className={cn(
+                  "w-full text-left px-4 py-2.5 text-sm transition-colors",
+                  activeMenu === item
+                    ? "bg-brand-primary text-white font-medium"
+                    : "text-gray-600 hover:bg-gray-50"
+                )}
+              >
+                {item}
+              </button>
+            ))}
+          </div>
+
+          {/* Right content */}
+          <div className="flex-1 bg-white rounded-lg border border-gray-200 p-6 min-h-[480px]">
+            {activeMenu === "Notification Setting"    && <NotificationSetting />}
+            {activeMenu === "Auto-Archive Setting"    && <AutoArchiveSetting />}
+            {activeMenu === "IP Whitelisting"         && <IPWhitelisting />}
+            {activeMenu === "Briefing Room"           && <BriefingRoom />}
+            {activeMenu === "Location"                && <LocationSetting />}
+            {activeMenu === "HUMS Interval"           && <HUMSInterval />}
+            {activeMenu === "RFID Transition Rules"   && <TransitionRuleForm title="RFID Transition Rules" defaultValue="80" />}
+            {activeMenu === "Armskote Transition Rules" && <TransitionRuleForm title="Armskote Transition Rules" defaultValue="60" />}
+            {activeMenu === "System Version"          && <SystemVersion />}
+            {activeMenu !== "Notification Setting"    &&
+             activeMenu !== "Auto-Archive Setting"    &&
+             activeMenu !== "IP Whitelisting"         &&
+             activeMenu !== "Briefing Room"           &&
+             activeMenu !== "Location"                &&
+             activeMenu !== "HUMS Interval"           &&
+             activeMenu !== "RFID Transition Rules"   &&
+             activeMenu !== "Armskote Transition Rules" &&
+             activeMenu !== "System Version"          && <PlaceholderContent title={activeMenu} />}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

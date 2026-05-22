@@ -1,0 +1,149 @@
+import { Breadcrumb } from "@/components/layout/Breadcrumb";
+import { assetStats, assetsByCategory, notifications } from "@/data/systemHardware";
+import { Bell } from "lucide-react";
+import { cn } from "@/lib/utils";
+
+const statCards = [
+  { label: "Total",          value: assetStats.total,         color: "bg-brand-navy text-white" },
+  { label: "Available",      value: assetStats.available,     color: "bg-green-500 text-white" },
+  { label: "Issued",         value: assetStats.issued,        color: "bg-purple-500 text-white" },
+  { label: "Pending Return", value: assetStats.pendingReturn, color: "bg-orange-400 text-white" },
+  { label: "Not Returned",   value: assetStats.notReturned,   color: "bg-red-500 text-white" },
+  { label: "Missing",        value: assetStats.missing,       color: "bg-gray-500 text-white" },
+  { label: "Maintenance",    value: assetStats.maintenance,   color: "bg-yellow-500 text-white" },
+  { label: "Overdue",        value: assetStats.overdue,       color: "bg-red-700 text-white" },
+];
+
+const DONUT_R = 60;
+const DONUT_STROKE = 22;
+const CIRCUMFERENCE = 2 * Math.PI * DONUT_R;
+
+function DonutChart() {
+  let offset = 0;
+  const segments = assetsByCategory.map((cat) => {
+    const dash = (cat.percentage / 100) * CIRCUMFERENCE;
+    const gap = CIRCUMFERENCE - dash;
+    const seg = { ...cat, dash, gap, offset };
+    offset += dash;
+    return seg;
+  });
+
+  const cx = 80;
+  const cy = 80;
+  const total = assetStats.total;
+
+  return (
+    <div className="flex items-center gap-6">
+      <svg width="160" height="160" viewBox="0 0 160 160">
+        {segments.map((seg) => (
+          <circle
+            key={seg.label}
+            cx={cx}
+            cy={cy}
+            r={DONUT_R}
+            fill="none"
+            stroke={seg.color}
+            strokeWidth={DONUT_STROKE}
+            strokeDasharray={`${seg.dash} ${seg.gap}`}
+            strokeDashoffset={-seg.offset + CIRCUMFERENCE / 4}
+            style={{ transform: "rotate(-90deg)", transformOrigin: `${cx}px ${cy}px` }}
+          />
+        ))}
+        <text x={cx} y={cy - 6} textAnchor="middle" className="text-2xl font-bold" fontSize="22" fontWeight="700" fill="#1a3a6b">
+          {total}
+        </text>
+        <text x={cx} y={cy + 12} textAnchor="middle" fontSize="10" fill="#6b7280">
+          Total Assets
+        </text>
+      </svg>
+      <div className="flex flex-col gap-2">
+        {assetsByCategory.map((cat) => (
+          <div key={cat.label} className="flex items-center gap-2 text-sm">
+            <span className="w-3 h-3 rounded-sm flex-shrink-0" style={{ backgroundColor: cat.color }} />
+            <span className="text-gray-700">{cat.label}</span>
+            <span className="ml-auto text-gray-500 font-medium">{cat.percentage}%</span>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+export function SHMDashboard() {
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-6">
+        <div className="mb-4">
+          <Breadcrumb items={["System Hardware Management", "Dashboard"]} />
+        </div>
+
+        <h1 className="text-xl font-semibold text-gray-800 mb-5">Asset Statistics</h1>
+
+        {/* Stat cards */}
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {statCards.map((card) => (
+            <div
+              key={card.label}
+              className={cn(
+                "rounded-lg px-5 py-4 flex flex-col gap-1",
+                card.color
+              )}
+            >
+              <span className="text-3xl font-bold leading-none">{card.value}</span>
+              <span className="text-sm opacity-90">{card.label}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* View All Assets */}
+        <div className="flex justify-end mb-6">
+          <button className="px-4 py-2 text-sm bg-brand-primary text-white rounded-md hover:bg-brand-primary-hover font-medium">
+            View All Assets
+          </button>
+        </div>
+
+        {/* Bottom row */}
+        <div className="grid grid-cols-2 gap-4">
+          {/* Assets by Category */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <h2 className="text-sm font-semibold text-gray-700 mb-4">Assets by Category</h2>
+            <DonutChart />
+          </div>
+
+          {/* Notifications */}
+          <div className="bg-white rounded-lg border border-gray-200 p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold text-gray-700">Notifications (Assets)</h2>
+              <button className="text-xs text-brand-primary font-medium hover:underline">
+                View All Notifications
+              </button>
+            </div>
+            <div className="flex flex-col gap-3">
+              {notifications.map((n) => (
+                <div
+                  key={n.id}
+                  className={cn(
+                    "flex items-start gap-3 p-3 rounded-lg border",
+                    n.isRead ? "bg-white border-gray-100" : "bg-red-50 border-red-100"
+                  )}
+                >
+                  <div className={cn(
+                    "mt-0.5 flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center",
+                    n.isRead ? "bg-gray-100" : "bg-brand-primary"
+                  )}>
+                    <Bell size={14} className={n.isRead ? "text-gray-400" : "text-white"} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-800">{n.title}</div>
+                    <div className="text-xs text-gray-500 mt-0.5 leading-relaxed">{n.description}</div>
+                    <div className="text-xs text-gray-400 mt-1">{n.timestamp}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

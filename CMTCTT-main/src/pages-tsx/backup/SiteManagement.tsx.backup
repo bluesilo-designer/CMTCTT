@@ -1,0 +1,981 @@
+import { useState, useRef, useEffect } from "react";
+import { Pagination } from "@/components/ui/Pagination";
+import { baseStations as initialStations } from "@/data/siteManagement";
+import type { BaseStation, Lane, LaneStatus } from "@/data/siteManagement";
+import {
+  Search, Trash2, Eye, MoreVertical, Download,
+  Plus, Check, X, CalendarX, Calendar, Home, ChevronRight, MapPin, Pencil,
+} from "lucide-react";
+import { SortIcon, type SortDir, nextSort, sortBy } from "@/lib/sortUtils";
+import { cn } from "@/lib/utils";
+
+const PER_PAGE = 10;
+const LANE_PER_PAGE = 10;
+
+// ── Status Badge ───────────────────────────────────────────────────────────────
+function StatusBadge({ status }: { status: string }) {
+  const active = status === "Active";
+  return (
+    <span className={cn(
+      "inline-flex items-center rounded-full border text-xs font-semibold px-2.5 py-0.5",
+      active ? "bg-green-50 text-green-600 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"
+    )}>
+      {status}
+    </span>
+  );
+}
+
+// ── Blackout dates tooltip ─────────────────────────────────────────────────────
+function BlackoutTooltip({ dates }: { dates: string[] }) {
+  const [show, setShow] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setShow(false); };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+  const visible = dates.slice(0, 2);
+  const extra = dates.slice(2);
+  return (
+    <div className="flex flex-col gap-0.5">
+      {visible.map((d, i) => <div key={i} className="text-sm text-gray-700">{d}</div>)}
+      {extra.length > 0 && (
+        <div ref={ref} className="relative inline-block">
+          <button onClick={() => setShow(v => !v)} className="text-xs text-brand-primary font-medium hover:underline">
+            +{extra.length} more
+          </button>
+          {show && (
+            <div className="absolute left-0 top-full mt-1.5 z-30 bg-white border border-gray-200 rounded-xl shadow-xl p-3 min-w-[240px]">
+              <p className="text-[10px] font-bold text-gray-400 uppercase tracking-wide mb-2">All Blackout Dates</p>
+              {dates.map((d, i) => (
+                <div key={i} className="flex items-start gap-2 mb-1.5">
+                  <CalendarX size={12} className="text-orange-400 mt-0.5 flex-shrink-0" />
+                  <span className="text-xs text-gray-700">{d}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── Row kebab menus ────────────────────────────────────────────────────────────
+function StationRowMenu({ onEdit, onDelete }: { onEdit: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(v => !v)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+        <MoreVertical size={15} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-44 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
+            <button onClick={() => { setOpen(false); onEdit(); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">
+              <Pencil size={13} className="text-gray-400" /> Edit Details
+            </button>
+            <button onClick={() => { setOpen(false); onDelete(); }}
+              className="w-full flex items-center gap-2.5 px-4 py-2 text-sm text-red-500 hover:bg-red-50">
+              <Trash2 size={13} /> Delete Base Station
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Add Base Station Modal ─────────────────────────────────────────────────────
+function AddBaseStationModal({ onClose, onAdd }: {
+  onClose: () => void;
+  onAdd: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState(false);
+
+  const handleConfirm = () => {
+    if (!name.trim()) { setError(true); return; }
+    onAdd(name.trim());
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <MapPin size={20} className="text-brand-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Add Base Station</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Please fill all the information.</p>
+          </div>
+        </div>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Base Station <span className="text-brand-primary">*</span>
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={e => { setName(e.target.value); if (e.target.value.trim()) setError(false); }}
+            placeholder="Enter base station (e.g, Base station A,etc)"
+            autoFocus
+            className={cn(
+              "w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary",
+              error ? "border-red-500" : "border-gray-200"
+            )}
+          />
+          {error && <p className="mt-1 text-xs text-red-500">Base Station name is required</p>}
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={handleConfirm}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Add Lane Modal ─────────────────────────────────────────────────────────────
+function AddLaneModal({ onClose, onAdd }: {
+  onClose: () => void;
+  onAdd: (name: string) => void;
+}) {
+  const [name, setName] = useState("");
+  const [error, setError] = useState(false);
+
+  const handleConfirm = () => {
+    if (!name.trim()) { setError(true); return; }
+    onAdd(name.trim());
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8">
+        <div className="flex items-start gap-4 mb-6">
+          <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <MapPin size={20} className="text-brand-primary" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-gray-900">Add Lane</h2>
+            <p className="text-sm text-gray-500 mt-0.5">Please fill all the information.</p>
+          </div>
+        </div>
+        <div className="mb-6">
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Lane <span className="text-brand-primary">*</span>
+          </label>
+          <input
+            type="text"
+            value={name}
+            onChange={e => { setName(e.target.value); if (e.target.value.trim()) setError(false); }}
+            placeholder="Enter lane (e.g, Lane A,etc)"
+            autoFocus
+            className={cn(
+              "w-full px-3 py-2.5 text-sm border rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary",
+              error ? "border-red-500" : "border-gray-200"
+            )}
+          />
+          {error && <p className="mt-1 text-xs text-red-500">Lane name is required</p>}
+        </div>
+        <div className="flex gap-3">
+          <button onClick={onClose}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold border border-gray-200 text-gray-700 hover:bg-gray-50">
+            Cancel
+          </button>
+          <button onClick={handleConfirm}
+            className="flex-1 py-2.5 rounded-lg text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function LaneRowMenu({ onToggle, onDelete }: { onToggle: () => void; onDelete: () => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <button onClick={() => setOpen(v => !v)} className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors">
+        <MoreVertical size={15} />
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 top-full mt-1 w-36 bg-white border border-gray-200 rounded-xl shadow-lg z-20 py-1">
+            <button onClick={() => { setOpen(false); onToggle(); }} className="w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-50">Toggle Status</button>
+            <button onClick={() => { setOpen(false); onDelete(); }} className="w-full text-left px-4 py-2 text-sm text-red-500 hover:bg-red-50">Delete</button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// ── Add Blackout Date Modal ────────────────────────────────────────────────────
+const TIME_OPTIONS = [
+  "06:00 AM","06:30 AM","07:00 AM","07:30 AM","08:00 AM","08:30 AM",
+  "09:00 AM","09:30 AM","10:00 AM","10:30 AM","11:00 AM","11:30 AM",
+  "12:00 PM","12:30 PM","01:00 PM","01:30 PM","02:00 PM","02:30 PM",
+  "03:00 PM","03:30 PM","04:00 PM","04:30 PM","05:00 PM","05:30 PM",
+  "06:00 PM","06:30 PM","07:00 PM","07:30 PM","08:00 PM","08:30 PM",
+  "09:00 PM","09:30 PM","10:00 PM",
+];
+const DAYS = ["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"] as const;
+
+function AddBlackoutModal({ onClose, onConfirm }: { onClose: () => void; onConfirm: (label: string) => void }) {
+  const [startDate, setStartDate] = useState("");
+  const [endDate, setEndDate] = useState("");
+  const [startTime, setStartTime] = useState("");
+  const [endTime, setEndTime] = useState("");
+  const [recurring, setRecurring] = useState(false);
+  const [selectedDays, setSelectedDays] = useState<Set<string>>(new Set());
+
+  const toggleDay = (day: string) =>
+    setSelectedDays(prev => { const n = new Set(prev); n.has(day) ? n.delete(day) : n.add(day); return n; });
+
+  const handleConfirm = () => {
+    if (!startDate.trim()) return;
+    let label = startDate;
+    if (endDate && endDate !== startDate) label += ` - ${endDate}`;
+    if (recurring && selectedDays.size > 0) {
+      const abbr = [...selectedDays].map(d => d.slice(0, 3));
+      label = `${abbr.join(", ")} (${startDate}${endDate && endDate !== startDate ? ` - ${endDate}` : ""})`;
+    }
+    onConfirm(label);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl mx-4">
+        <div className="flex items-start gap-4 px-6 pt-6 pb-5">
+          <div className="w-11 h-11 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+            <Calendar size={20} className="text-brand-primary" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-bold text-gray-800">Add Blackout Date</h3>
+            <p className="text-sm text-gray-500 mt-0.5">Please fill all the information.</p>
+          </div>
+          <button onClick={onClose} className="p-1 text-gray-400 hover:text-gray-600 rounded">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="px-6 pb-5 space-y-5">
+          <div className="grid grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Start &amp; End Date <span className="text-red-500">*</span></label>
+              <div className="flex gap-2">
+                <input type="date" value={startDate} onChange={e => setStartDate(e.target.value)}
+                  className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary" />
+                <input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate}
+                  className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary" />
+              </div>
+            </div>
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-1.5">Start &amp; End Time <span className="text-red-500">*</span></label>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-gray-500 font-medium">Start</span>
+                <select value={startTime} onChange={e => setStartTime(e.target.value)}
+                  className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary">
+                  <option value="">Select time</option>
+                  {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+                <span className="text-xs text-gray-500 font-medium">End</span>
+                <select value={endTime} onChange={e => setEndTime(e.target.value)}
+                  className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/30 focus:border-brand-primary">
+                  <option value="">Select time</option>
+                  {TIME_OPTIONS.map(t => <option key={t} value={t}>{t}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+          <div className="flex items-center gap-3">
+            <button type="button" onClick={() => setRecurring(v => !v)}
+              className={cn("relative inline-flex h-6 w-11 items-center rounded-full transition-colors flex-shrink-0", recurring ? "bg-brand-primary" : "bg-gray-200")}>
+              <span className={cn("inline-block h-4 w-4 rounded-full bg-white shadow transition-transform", recurring ? "translate-x-6" : "translate-x-1")} />
+            </button>
+            <span className="text-sm font-semibold text-gray-700">Use recurring date</span>
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-2">Select Days Recurring</label>
+            <div className="flex flex-wrap gap-2">
+              {DAYS.map(day => (
+                <button key={day} type="button" onClick={() => toggleDay(day)}
+                  className={cn("px-4 py-2 text-sm font-semibold rounded-lg border transition-colors",
+                    selectedDays.has(day) ? "bg-brand-primary text-white border-brand-primary" : "text-gray-600 border-gray-200 hover:border-brand-primary hover:text-brand-primary"
+                  )}>
+                  {day}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="px-6 pb-6 flex gap-3">
+          <button onClick={onClose} className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-600 hover:bg-gray-50">Cancel</button>
+          <button onClick={handleConfirm} disabled={!startDate.trim()}
+            className="flex-1 py-2.5 rounded-xl bg-brand-primary text-white text-sm font-semibold hover:bg-brand-primary-hover disabled:opacity-40">
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── Base Station List ──────────────────────────────────────────────────────────
+function StationList({ onView }: { onView: (station: BaseStation) => void }) {
+  const [stations, setStations] = useState<BaseStation[]>(initialStations);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [sortField, setSortField] = useState("");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [showAddModal, setShowAddModal] = useState(false);
+
+  const filtered = stations.filter(s => !searchQuery || s.name.toLowerCase().includes(searchQuery.toLowerCase()));
+  const handleSort = (field: string) => { const s = nextSort(sortField, field, sortDir); setSortField(s.field); setSortDir(s.dir); setCurrentPage(1); };
+  const sorted = sortField ? sortBy(filtered, sortField as any, sortDir) : filtered;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
+  const paginated = sorted.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const allSelected = paginated.length > 0 && paginated.every(s => selected.has(s.id));
+  const someSelected = paginated.some(s => selected.has(s.id));
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(paginated.map(s => s.id)));
+  const toggleSelect = (id: string) =>
+    setSelected(prev => { const next = new Set(prev); next.has(id) ? next.delete(id) : next.add(id); return next; });
+
+  const getLaneSummary = (station: BaseStation) => {
+    if (station.lanes.length === 0) return [{ label: "0 Lanes", status: "Active" as LaneStatus }];
+    const active = station.lanes.filter(l => l.status === "Active").length;
+    const inactive = station.lanes.filter(l => l.status === "Inactive").length;
+    const result: { label: string; status: LaneStatus }[] = [];
+    if (active > 0) result.push({ label: `${active} Lane${active !== 1 ? "s" : ""}`, status: "Active" });
+    if (inactive > 0) result.push({ label: `${inactive} Lane${inactive !== 1 ? "s" : ""}`, status: "Inactive" });
+    return result;
+  };
+
+  const handleAddStation = (name: string) => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setStations(prev => [...prev, {
+      id: `st-${Date.now()}`,
+      name,
+      status: "Active",
+      lanes: [],
+      blackoutDates: [],
+      lastUpdatedOn: `${dateStr}\n${timeStr}`,
+    }]);
+  };
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-6">
+        {/* Page header */}
+        <div className="flex items-center justify-between mb-5">
+          <h1 className="text-xl font-semibold text-gray-800">Site Management</h1>
+          <div className="flex items-center gap-3">
+            <button className="flex items-center gap-2 px-4 py-2.5 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-semibold transition-colors">
+              <Download size={14} /> Export
+            </button>
+            <button
+              onClick={() => setShowAddModal(true)}
+              className="flex items-center gap-1.5 px-4 py-2.5 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover font-semibold shadow-sm transition-colors">
+              Add Base Station
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {/* Sub-header: count + search + delete */}
+          <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h2 className="text-sm font-bold text-gray-800">
+              Base Station <span className="text-gray-500 font-normal">({stations.length} Base Stations)</span>
+            </h2>
+            <div className="flex items-center gap-3">
+              {selected.size > 0 && (
+                <button onClick={() => { setStations(prev => prev.filter(s => !selected.has(s.id))); setSelected(new Set()); }}
+                  className="flex items-center gap-1.5 text-sm font-medium text-red-500 hover:text-red-600 transition-colors">
+                  <Trash2 size={14} /> Delete
+                </button>
+              )}
+              <div className="relative">
+                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input type="text" placeholder="Search" value={searchQuery}
+                  onChange={e => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-48 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary" />
+              </div>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-red-50/70 border-b border-gray-100">
+                  <th className="w-10 px-4 py-3">
+                    <input type="checkbox" checked={allSelected}
+                      ref={el => { if (el) el.indeterminate = someSelected && !allSelected; }}
+                      onChange={toggleAll} className="rounded border-gray-300 accent-brand-primary" />
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary w-12">No</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[180px]">
+                    <button onClick={() => handleSort("name")} className="flex items-center gap-1 hover:text-brand-primary-hover">
+                      <Search size={12} className="text-gray-400" /> Base Station <SortIcon active={sortField === "name"} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[110px]">Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[160px]">Lane</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[200px]">Blackout Date</th>
+                  <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[160px]">Last Updated On</th>
+                  <th className="w-20 px-4 py-3 text-xs font-bold text-brand-primary text-center">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-50">
+                {paginated.map((station, idx) => (
+                  <tr key={station.id} onClick={() => onView(station)} className="hover:bg-gray-50/80 transition-colors cursor-pointer">
+                    <td className="px-4 py-3.5 text-center" onClick={e => e.stopPropagation()}>
+                      <input type="checkbox" checked={selected.has(station.id)} onChange={() => toggleSelect(station.id)}
+                        className="rounded border-gray-300 accent-brand-primary" />
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-gray-600">{(currentPage - 1) * PER_PAGE + idx + 1}</td>
+                    <td className="px-4 py-3.5 text-sm font-semibold text-gray-800 hover:text-brand-primary">{station.name}</td>
+                    <td className="px-4 py-3.5"><StatusBadge status={station.status} /></td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex flex-col gap-1">
+                        {getLaneSummary(station).map((s, i) => (
+                          <div key={i} className="flex items-center gap-2 text-sm text-gray-700">
+                            <span>{s.label}</span>
+                            {s.label !== "0 Lanes" && (
+                              <span className={cn("inline-flex items-center rounded-full border text-xs font-semibold px-2 py-0.5",
+                                s.status === "Active" ? "bg-green-50 text-green-600 border-green-200" : "bg-gray-100 text-gray-500 border-gray-200"
+                              )}>{s.status}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                      {station.blackoutDates.length > 0
+                        ? <BlackoutTooltip dates={station.blackoutDates.map(d => d.label)} />
+                        : <span className="text-gray-300 text-sm">—</span>}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="text-sm text-gray-800">{station.lastUpdatedOn.split("\n")[0]}</div>
+                      <div className="text-xs text-gray-400">{station.lastUpdatedOn.split("\n")[1]}</div>
+                    </td>
+                    <td className="px-4 py-3.5" onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center justify-center gap-1">
+                        <button onClick={() => onView(station)} className="p-1.5 rounded-lg text-gray-400 hover:text-brand-primary hover:bg-gray-100 transition-colors">
+                          <Eye size={15} />
+                        </button>
+                        <StationRowMenu onEdit={() => {}} onDelete={() => setStations(prev => prev.filter(s => s.id !== station.id))} />
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <Pagination current={currentPage} total={totalPages} perPage={PER_PAGE} totalItems={sorted.length} onPageChange={setCurrentPage} />
+        </div>
+      </div>
+
+      {showAddModal && (
+        <AddBaseStationModal onClose={() => setShowAddModal(false)} onAdd={handleAddStation} />
+      )}
+    </div>
+  );
+}
+
+// ── Base Station Detail ────────────────────────────────────────────────────────
+type DetailTab = "details" | "blackout";
+
+function StationDetail({
+  station,
+  onBack,
+  onViewLane,
+}: {
+  station: BaseStation;
+  onBack: () => void;
+  onViewLane: (lane: Lane) => void;
+}) {
+  const [activeTab, setActiveTab] = useState<DetailTab>("details");
+  const [lanes, setLanes] = useState<Lane[]>(station.lanes);
+  const [blackoutDates, setBlackoutDates] = useState(station.blackoutDates);
+  const [laneSearch, setLaneSearch] = useState("");
+  const [lanePage, setLanePage] = useState(1);
+  const [successMsg, setSuccessMsg] = useState("");
+  const [showAddBlackout, setShowAddBlackout] = useState(false);
+  const [laneSortField, setLaneSortField] = useState("");
+  const [laneSortDir, setLaneSortDir] = useState<SortDir>("asc");
+  const [laneSelected, setLaneSelected] = useState<Set<string>>(new Set());
+  const [showAddLane, setShowAddLane] = useState(false);
+
+  const filteredLanes = lanes.filter(l => !laneSearch || l.name.toLowerCase().includes(laneSearch.toLowerCase()));
+  const handleLaneSort = (field: string) => {
+    const s = nextSort(laneSortField, field, laneSortDir);
+    setLaneSortField(s.field);
+    setLaneSortDir(s.dir);
+    setLanePage(1);
+  };
+  const sortedLanes = laneSortField ? sortBy(filteredLanes, laneSortField as any, laneSortDir) : filteredLanes;
+  const laneTotalPages = Math.max(1, Math.ceil(sortedLanes.length / LANE_PER_PAGE));
+  const paginatedLanes = sortedLanes.slice((lanePage - 1) * LANE_PER_PAGE, lanePage * LANE_PER_PAGE);
+
+  const allLanesSelected = paginatedLanes.length > 0 && paginatedLanes.every(l => laneSelected.has(l.id));
+  const someLanesSelected = paginatedLanes.some(l => laneSelected.has(l.id));
+  const toggleAllLanes = () => setLaneSelected(allLanesSelected ? new Set() : new Set(paginatedLanes.map(l => l.id)));
+  const toggleLane = (id: string) => setLaneSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n; });
+
+  const showSuccess = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(""), 3000); };
+  const handleToggleLane = (id: string) => {
+    setLanes(prev => prev.map(l => l.id === id ? { ...l, status: l.status === "Active" ? "Inactive" : "Active" } : l));
+    showSuccess("Lane status updated.");
+  };
+  const handleDeleteLane = (id: string) => { setLanes(prev => prev.filter(l => l.id !== id)); showSuccess("Lane removed."); };
+
+  const handleAddLane = (name: string) => {
+    const now = new Date();
+    const dateStr = now.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const timeStr = now.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+    setLanes(prev => [...prev, {
+      id: `lane-${Date.now()}`,
+      name,
+      status: "Active",
+      blackoutDates: [],
+      lastUpdatedOn: `${dateStr}\n${timeStr}`,
+    }]);
+    showSuccess("Lane added successfully.");
+  };
+
+  const lastUpdatedDate = station.lastUpdatedOn.split("\n")[0];
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-6">
+        {successMsg && (
+          <div className="fixed top-6 right-6 z-50 flex items-center gap-2.5 bg-green-600 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg">
+            <Check size={16} />{successMsg}
+          </div>
+        )}
+
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-sm mb-5">
+          <button onClick={onBack} className="text-gray-500 hover:text-brand-primary transition-colors">
+            Site Management
+          </button>
+          <ChevronRight size={14} className="text-gray-400" />
+          <span className="text-brand-primary font-medium">Base Station Details</span>
+        </nav>
+
+        {/* Card */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-start justify-between px-6 pt-5 pb-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-lg font-bold text-gray-900">{station.name}</h1>
+                <StatusBadge status={station.status} />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Last updated on: {lastUpdatedDate}</p>
+            </div>
+            <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors mt-0.5">
+              <MoreVertical size={16} />
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 px-6">
+            {([
+              { key: "details" as DetailTab, label: "Base Station Details" },
+              { key: "blackout" as DetailTab, label: "Blackout Dates" },
+            ]).map(({ key, label }) => (
+              <button key={key} onClick={() => setActiveTab(key)}
+                className={cn(
+                  "px-1 py-3 mr-6 text-sm font-semibold border-b-2 transition-colors -mb-px",
+                  activeTab === key
+                    ? "border-brand-primary text-brand-primary"
+                    : "border-transparent text-gray-400 hover:text-gray-600"
+                )}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Details Tab ── */}
+          {activeTab === "details" && (
+            <>
+              {/* Info section */}
+              <div className="px-6 py-5 border-b border-gray-100">
+                <h2 className="text-sm font-bold text-gray-800 mb-4">Base Station Details</h2>
+                <div className="grid grid-cols-3 divide-x divide-gray-100">
+                  <div className="pr-6">
+                    <p className="text-xs text-gray-400">Base Station</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{station.name}</p>
+                    <p className="text-xs text-gray-400 mt-3">Status</p>
+                    <div className="mt-1"><StatusBadge status={station.status} /></div>
+                  </div>
+                  <div className="px-6">
+                    <p className="text-xs text-gray-400">Lane</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5">Lane</p>
+                  </div>
+                  <div className="pl-6">
+                    <p className="text-xs text-gray-400">Blackout Dates</p>
+                    <p className="text-sm font-semibold text-gray-800 mt-0.5">{blackoutDates.length}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* Lane table section */}
+              <div>
+                <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                  <h2 className="text-sm font-bold text-gray-800">
+                    Lane <span className="text-gray-400 font-normal">({lanes.length} Lanes)</span>
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                      <input type="text" placeholder="Search" value={laneSearch}
+                        onChange={e => { setLaneSearch(e.target.value); setLanePage(1); }}
+                        className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-lg w-48 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary" />
+                    </div>
+                    <button className="flex items-center gap-2 px-3.5 py-2 text-sm border border-gray-200 rounded-lg text-gray-600 hover:bg-gray-50 font-semibold">
+                      <Download size={13} /> Export
+                    </button>
+                    <button onClick={() => setShowAddLane(true)}
+                      className="flex items-center gap-2 px-3.5 py-2 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover font-semibold">
+                      Add Lane
+                    </button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="bg-red-50/70 border-b border-gray-100">
+                        <th className="w-10 px-4 py-3">
+                          <input type="checkbox" checked={allLanesSelected}
+                            ref={el => { if (el) el.indeterminate = someLanesSelected && !allLanesSelected; }}
+                            onChange={toggleAllLanes} className="rounded border-gray-300 accent-brand-primary" />
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[140px]">
+                          <button onClick={() => handleLaneSort("name")} className="flex items-center gap-1 hover:text-brand-primary-hover">
+                            <Search size={12} className="text-gray-400" /> Lane <SortIcon active={laneSortField === "name"} dir={laneSortDir} />
+                          </button>
+                        </th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[110px]">Status</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[200px]">Blackout Date</th>
+                        <th className="text-left px-4 py-3 text-xs font-bold text-brand-primary min-w-[160px]">Last Updated On</th>
+                        <th className="w-20 px-4 py-3 text-xs font-bold text-brand-primary text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-50">
+                      {paginatedLanes.length === 0 ? (
+                        <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">No lanes found</td></tr>
+                      ) : paginatedLanes.map(lane => (
+                        <tr key={lane.id} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="px-4 py-3.5 text-center">
+                            <input type="checkbox" checked={laneSelected.has(lane.id)} onChange={() => toggleLane(lane.id)}
+                              className="rounded border-gray-300 accent-brand-primary" />
+                          </td>
+                          <td className="px-4 py-3.5 text-sm font-medium text-gray-800">{lane.name}</td>
+                          <td className="px-4 py-3.5"><StatusBadge status={lane.status} /></td>
+                          <td className="px-4 py-3.5">
+                            {lane.blackoutDates.length > 0 ? (
+                              <div className="flex flex-col gap-0.5">
+                                {lane.blackoutDates.map((d, i) => <span key={i} className="text-sm text-gray-700">{d}</span>)}
+                              </div>
+                            ) : <span className="text-gray-300 text-sm">—</span>}
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="text-sm text-gray-800">{lane.lastUpdatedOn.split("\n")[0]}</div>
+                            <div className="text-xs text-gray-400">{lane.lastUpdatedOn.split("\n")[1]}</div>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center justify-center gap-1">
+                              <button onClick={() => onViewLane(lane)}
+                                className="p-1.5 rounded-lg text-gray-400 hover:text-brand-primary hover:bg-gray-100 transition-colors">
+                                <Eye size={14} />
+                              </button>
+                              <LaneRowMenu
+                                onToggle={() => handleToggleLane(lane.id)}
+                                onDelete={() => handleDeleteLane(lane.id)}
+                              />
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                <Pagination current={lanePage} total={laneTotalPages} perPage={LANE_PER_PAGE} totalItems={sortedLanes.length} onPageChange={setLanePage} />
+              </div>
+            </>
+          )}
+
+          {/* ── Blackout Tab ── */}
+          {activeTab === "blackout" && (
+            <div>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-bold text-gray-700">
+                  Blackout Dates <span className="text-gray-400 font-normal ml-1">({blackoutDates.length})</span>
+                </h2>
+                <button onClick={() => setShowAddBlackout(true)}
+                  className="flex items-center gap-2 px-3.5 py-2 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover font-semibold">
+                  <Plus size={13} /> Add Date
+                </button>
+              </div>
+              {blackoutDates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <CalendarX size={36} className="mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No blackout dates configured</p>
+                  <p className="text-xs mt-1">Add dates when this station is unavailable</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {blackoutDates.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between px-6 py-3.5 hover:bg-gray-50/80">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                          <CalendarX size={15} className="text-orange-500" />
+                        </div>
+                        <span className="text-sm text-gray-800 font-medium">{d.label}</span>
+                      </div>
+                      <button onClick={() => setBlackoutDates(prev => prev.filter((_, idx) => idx !== i))}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showAddLane && (
+        <AddLaneModal onClose={() => setShowAddLane(false)} onAdd={handleAddLane} />
+      )}
+
+      {showAddBlackout && (
+        <AddBlackoutModal
+          onClose={() => setShowAddBlackout(false)}
+          onConfirm={label => {
+            setBlackoutDates(prev => [...prev, { label }]);
+            showSuccess("Blackout date added successfully.");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Lane Detail ────────────────────────────────────────────────────────────────
+type LaneDetailTab = "details" | "blackout";
+
+function LaneDetail({
+  station,
+  lane,
+  onBackToList,
+  onBackToStation,
+}: {
+  station: BaseStation;
+  lane: Lane;
+  onBackToList: () => void;
+  onBackToStation: () => void;
+}) {
+  const [activeTab, setActiveTab] = useState<LaneDetailTab>("details");
+  const [blackoutDates, setBlackoutDates] = useState<string[]>(lane.blackoutDates);
+  const [showAddBlackout, setShowAddBlackout] = useState(false);
+  const [successMsg, setSuccessMsg] = useState("");
+
+  const showSuccess = (msg: string) => { setSuccessMsg(msg); setTimeout(() => setSuccessMsg(""), 3000); };
+  const lastUpdatedDate = lane.lastUpdatedOn.split("\n")[0];
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      <div className="p-6">
+        {successMsg && (
+          <div className="fixed top-6 right-6 z-50 flex items-center gap-2.5 bg-green-600 text-white text-sm font-medium px-4 py-3 rounded-xl shadow-lg">
+            <Check size={16} />{successMsg}
+          </div>
+        )}
+
+        {/* Breadcrumb */}
+        <nav className="flex items-center gap-1.5 text-sm mb-5">
+          <button onClick={onBackToList} className="text-gray-400 hover:text-brand-primary transition-colors">
+            <Home size={14} />
+          </button>
+          <ChevronRight size={14} className="text-gray-400" />
+          <button onClick={onBackToList} className="text-gray-500 hover:text-brand-primary transition-colors">
+            Site Management
+          </button>
+          <ChevronRight size={14} className="text-gray-400" />
+          <button onClick={onBackToStation} className="text-gray-500 hover:text-brand-primary transition-colors">
+            Base Station Details
+          </button>
+          <ChevronRight size={14} className="text-gray-400" />
+          <span className="text-brand-primary font-medium">Lane Details</span>
+        </nav>
+
+        {/* Card */}
+        <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-start justify-between px-6 pt-5 pb-4">
+            <div>
+              <div className="flex items-center gap-2.5">
+                <h1 className="text-lg font-bold text-gray-900">{lane.name}</h1>
+                <StatusBadge status={lane.status} />
+              </div>
+              <p className="text-xs text-gray-400 mt-1">Last updated on: {lastUpdatedDate}</p>
+            </div>
+            <button className="p-1.5 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors mt-0.5">
+              <MoreVertical size={16} />
+            </button>
+          </div>
+
+          {/* Tabs */}
+          <div className="flex border-b border-gray-200 px-6">
+            {([
+              { key: "details" as LaneDetailTab, label: "Lane Details" },
+              { key: "blackout" as LaneDetailTab, label: "Blackout Dates" },
+            ]).map(({ key, label }) => (
+              <button key={key} onClick={() => setActiveTab(key)}
+                className={cn(
+                  "px-1 py-3 mr-6 text-sm font-semibold border-b-2 transition-colors -mb-px",
+                  activeTab === key
+                    ? "border-brand-primary text-brand-primary"
+                    : "border-transparent text-gray-400 hover:text-gray-600"
+                )}>
+                {label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── Lane Details Tab ── */}
+          {activeTab === "details" && (
+            <div className="px-6 py-5">
+              <h2 className="text-sm font-bold text-gray-800 mb-4">Lane Details</h2>
+              <div className="grid grid-cols-3 divide-x divide-gray-100">
+                <div className="pr-6">
+                  <p className="text-xs text-gray-400">Lane</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{lane.name}</p>
+                  <p className="text-xs text-gray-400 mt-3">Lane status</p>
+                  <div className="mt-1"><StatusBadge status={lane.status} /></div>
+                </div>
+                <div className="px-6">
+                  <p className="text-xs text-gray-400">Base Station</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5">{station.name}</p>
+                  <p className="text-xs text-gray-400 mt-3">Station status</p>
+                  <div className="mt-1"><StatusBadge status={station.status} /></div>
+                </div>
+                <div className="pl-6">
+                  <p className="text-xs text-gray-400">Blackout Dates</p>
+                  <p className="text-sm font-semibold text-gray-800 mt-0.5">
+                    {blackoutDates.length} {blackoutDates.length === 1 ? "Day" : "Day"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Blackout Tab ── */}
+          {activeTab === "blackout" && (
+            <div>
+              <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-bold text-gray-700">
+                  Blackout Dates <span className="text-gray-400 font-normal ml-1">({blackoutDates.length})</span>
+                </h2>
+                <button onClick={() => setShowAddBlackout(true)}
+                  className="flex items-center gap-2 px-3.5 py-2 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover font-semibold">
+                  <Plus size={13} /> Add Date
+                </button>
+              </div>
+              {blackoutDates.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-gray-400">
+                  <CalendarX size={36} className="mb-3 opacity-30" />
+                  <p className="text-sm font-medium">No blackout dates configured</p>
+                  <p className="text-xs mt-1">Add dates when this lane is unavailable</p>
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-50">
+                  {blackoutDates.map((d, i) => (
+                    <div key={i} className="flex items-center justify-between px-6 py-3.5 hover:bg-gray-50/80">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-lg bg-orange-50 flex items-center justify-center">
+                          <CalendarX size={15} className="text-orange-500" />
+                        </div>
+                        <span className="text-sm text-gray-800 font-medium">{d}</span>
+                      </div>
+                      <button onClick={() => setBlackoutDates(prev => prev.filter((_, idx) => idx !== i))}
+                        className="p-1.5 rounded-lg text-gray-400 hover:text-red-500 hover:bg-red-50 transition-colors">
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {showAddBlackout && (
+        <AddBlackoutModal
+          onClose={() => setShowAddBlackout(false)}
+          onConfirm={label => {
+            setBlackoutDates(prev => [...prev, label]);
+            showSuccess("Blackout date added successfully.");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+// ── Main export ────────────────────────────────────────────────────────────────
+type View =
+  | { type: "list" }
+  | { type: "station"; station: BaseStation }
+  | { type: "lane"; station: BaseStation; lane: Lane };
+
+export function SiteManagement() {
+  const [view, setView] = useState<View>({ type: "list" });
+
+  if (view.type === "station") {
+    return (
+      <StationDetail
+        station={view.station}
+        onBack={() => setView({ type: "list" })}
+        onViewLane={lane => setView({ type: "lane", station: view.station, lane })}
+      />
+    );
+  }
+
+  if (view.type === "lane") {
+    return (
+      <LaneDetail
+        station={view.station}
+        lane={view.lane}
+        onBackToList={() => setView({ type: "list" })}
+        onBackToStation={() => setView({ type: "station", station: view.station })}
+      />
+    );
+  }
+
+  return <StationList onView={station => setView({ type: "station", station })} />;
+}

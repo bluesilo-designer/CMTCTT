@@ -1,0 +1,488 @@
+import { useState, useEffect } from "react";
+import { Login } from "@/pages/Login";
+import { Sidebar } from "@/components/layout/Sidebar";
+import { Header } from "@/components/layout/Header";
+import { Dashboard } from "@/pages/Dashboard";
+import { TodaysBooking } from "@/pages/TodaysBooking";
+import { BookingList } from "@/pages/BookingList";
+import { TrainingResults } from "@/pages/TrainingResults";
+import { AssetMovementReport } from "@/pages/AssetMovementReport";
+import { StockTakeVarianceReport } from "@/pages/StockTakeVarianceReport";
+import { AssetsAuditReport } from "@/pages/AssetsAuditReport";
+import { UserList } from "@/pages/UserList";
+import { UserRole } from "@/pages/UserRole";
+import { RolePermission } from "@/pages/RolePermission";
+import { RankPage } from "@/pages/Rank";
+import { SiteManagement } from "@/pages/SiteManagement";
+import { SHMDashboard } from "@/pages/SHMDashboard";
+import { AssetsList } from "@/pages/AssetsList";
+import { AssignmentList } from "@/pages/AssignmentList";
+import { AssetType } from "@/pages/AssetType";
+import { AssetCategory } from "@/pages/AssetCategory";
+import { AssetTracking } from "@/pages/AssetTracking";
+import { RFIDReaderListing } from "@/pages/RFIDReaderListing";
+import { AntennaListing } from "@/pages/AntennaListing";
+import { SystemHealth } from "@/pages/SystemHealth";
+import { OperationalAvailability } from "@/pages/OperationalAvailability";
+import { OperationalAvailability2 } from "@/pages/OperationalAvailability2";
+import { Dashboard2 } from "@/pages/Dashboard2";
+import { OperationalAvailabilityMonth } from "@/pages/OperationalAvailabilityMonth";
+import { OperationalAvailabilityDetail } from "@/pages/OperationalAvailabilityDetail";
+import { SystemMaintenance } from "@/pages/SystemMaintenance";
+import { DataExport } from "@/pages/DataExport";
+import { DataImport } from "@/pages/DataImport";
+import { ActivityLog } from "@/pages/ActivityLog";
+import { Settings } from "@/pages/Settings";
+import { CreateBooking } from "@/pages/CreateBooking";
+import { BookingDetail } from "@/pages/BookingDetail";
+import { TrainingDetail } from "@/pages/TrainingDetail";
+import { UserDetail } from "@/pages/UserDetail";
+import { ResourcePlanning } from "@/pages/ResourcePlanning";
+import { CreateAssignment } from "@/pages/CreateAssignment";
+import { IssueAssets } from "@/pages/IssueAssets";
+import { SidebarV2 } from "@/components/layout/SidebarV2";
+import { SidebarV3 } from "@/components/layout/SidebarV3";
+import { Notifications } from "@/pages/Notifications";
+import { AssetDetail } from "@/pages/AssetDetail";
+import { AssetCreation } from "@/pages/AssetCreation";
+
+// ── Zoom levels ───────────────────────────────────────────────────────────────
+const ZOOM_LEVELS = [
+  { value: 1,    label: "1×",     desc: "Normal" },
+  { value: 1.25, label: "1.25×",  desc: "Large" },
+  { value: 1.5,  label: "1.5×",   desc: "Larger" },
+  { value: 2,    label: "2×",     desc: "Extra Large" },
+] as const;
+
+type ZoomValue = (typeof ZOOM_LEVELS)[number]["value"];
+
+const ZOOM_KEY = "trms_zoom";
+
+function ZoomControl() {
+  const [zoom, setZoom] = useState<ZoomValue>(() => {
+    const saved = parseFloat(localStorage.getItem(ZOOM_KEY) ?? "1");
+    return (ZOOM_LEVELS.find(z => z.value === saved)?.value ?? 1) as ZoomValue;
+  });
+  const [open, setOpen] = useState(false);
+
+  // Apply zoom to root element
+  useEffect(() => {
+    (document.documentElement.style as any).zoom = String(zoom);
+    localStorage.setItem(ZOOM_KEY, String(zoom));
+  }, [zoom]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      const el = document.getElementById("zoom-control-root");
+      if (el && !el.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const current = ZOOM_LEVELS.find(z => z.value === zoom)!;
+
+  return (
+    <div id="zoom-control-root" className="fixed bottom-8 left-4 z-50" style={{ zoom: String(1 / zoom) }}>
+      {open && (
+        <div className="mb-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden w-44">
+          <div className="px-3 py-2 border-b border-gray-100">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Text Size</p>
+          </div>
+          {ZOOM_LEVELS.map((level) => (
+            <button
+              key={level.value}
+              onClick={() => { setZoom(level.value); setOpen(false); }}
+              className={`w-full flex items-center justify-between px-3 py-2.5 text-sm transition-colors ${
+                zoom === level.value
+                  ? "bg-brand-primary/10 text-brand-primary font-semibold"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <span>{level.desc}</span>
+              <span className={`text-xs font-mono px-1.5 py-0.5 rounded ${
+                zoom === level.value
+                  ? "bg-brand-primary text-white"
+                  : "bg-gray-100 text-gray-500"
+              }`}>{level.label}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => setOpen(v => !v)}
+        title="Text size"
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-full shadow-md border text-sm font-semibold transition-all ${
+          open
+            ? "bg-brand-primary text-white border-brand-primary"
+            : "bg-white text-gray-600 border-gray-200 hover:border-brand-primary hover:text-brand-primary"
+        }`}
+      >
+        <span className="text-base leading-none font-bold">A</span>
+        <span className="text-xs">{current.label}</span>
+      </button>
+    </div>
+  );
+}
+
+function VersionFooter() {
+  return (
+    <div className="fixed bottom-0 right-0 p-2 text-[10px] text-gray-400">
+      v0.6.7
+    </div>
+  );
+}
+
+const NAV_KEY = "trms_nav";
+type NavVer = "v1" | "v2" | "v3" | "v4" | "v5" | "v6" | "v7";
+
+function NavSwitcher() {
+  const [current, setCurrent] = useState<NavVer>(
+    () => (localStorage.getItem(NAV_KEY) as NavVer) ?? "v2"
+  );
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const handler = () => setCurrent((localStorage.getItem(NAV_KEY) as NavVer) ?? "v2");
+    window.addEventListener("trms_nav_change", handler);
+    return () => window.removeEventListener("trms_nav_change", handler);
+  }, []);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      const el = document.getElementById("nav-switcher-root");
+      if (el && !el.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const select = (v: NavVer) => {
+    localStorage.setItem(NAV_KEY, v);
+    window.dispatchEvent(new CustomEvent("trms_nav_change"));
+    setOpen(false);
+  };
+
+  const options: { value: NavVer; label: string; color: string }[] = [
+    { value: "v1", label: "Classic",      color: "bg-gray-400"    },
+    { value: "v2", label: "Dark",         color: "bg-[#1C1C2E]"   },
+    { value: "v3", label: "Brand Red",    color: "bg-[#7A1515]"   },
+    { value: "v4", label: "Brand Navy",   color: "bg-[#1A3A6B]"   },
+    { value: "v5", label: "Forest",       color: "bg-[#1E4A2E]"   },
+    { value: "v6", label: "Slate",        color: "bg-[#334155]"   },
+    { value: "v7", label: "Midnight",     color: "bg-[#0F172A]"   },
+  ];
+
+  return (
+    <div id="nav-switcher-root" className="fixed bottom-8 left-20 z-50">
+      {open && (
+        <div className="mb-2 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden w-44">
+          <div className="px-3 py-2 border-b border-gray-100">
+            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Navbar Style</p>
+          </div>
+          {options.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => select(opt.value)}
+              className={`w-full flex items-center gap-2.5 px-3 py-2.5 text-sm transition-colors ${
+                current === opt.value
+                  ? "bg-brand-primary/10 text-brand-primary font-semibold"
+                  : "text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <span className={`w-4 h-4 rounded flex-shrink-0 ${opt.color}`} />
+              {opt.label}
+              {current === opt.value && (
+                <span className="ml-auto text-[10px] bg-brand-primary text-white px-1.5 py-0.5 rounded font-bold">ON</span>
+              )}
+            </button>
+          ))}
+        </div>
+      )}
+      <button
+        onClick={() => setOpen(v => !v)}
+        title="Switch navbar"
+        className={`flex items-center gap-1.5 px-3 py-2 rounded-full shadow-md border text-sm font-semibold transition-all ${
+          open
+            ? "bg-brand-primary text-white border-brand-primary"
+            : "bg-white text-gray-600 border-gray-200 hover:border-brand-primary hover:text-brand-primary"
+        }`}
+      >
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="3" y="3" width="7" height="18" rx="1"/>
+          <rect x="14" y="3" width="7" height="5" rx="1"/>
+          <rect x="14" y="12" width="7" height="5" rx="1"/>
+        </svg>
+        <span className="text-xs uppercase">{current}</span>
+      </button>
+    </div>
+  );
+}
+
+export default function App() {
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [currentPath, setCurrentPath] = useState(() => {
+    const hash = window.location.hash.slice(1); // Remove # prefix
+    return hash || "/bookings/list";
+  });
+  const [navVersion, setNavVersion] = useState<NavVer>(() =>
+    (localStorage.getItem("trms_nav") as NavVer) ?? "v2"
+  );
+
+  // Sync navVersion from Settings page (storage event)
+  useEffect(() => {
+    const handler = () => {
+      const v = (localStorage.getItem("trms_nav") as NavVer) ?? "v2";
+      setNavVersion(v);
+    };
+    window.addEventListener("trms_nav_change", handler);
+    return () => window.removeEventListener("trms_nav_change", handler);
+  }, []);
+
+  const navigate = (path: string) => {
+    window.location.hash = path;
+  };
+
+  const handleLogout = () => {
+    setIsLoggedIn(false);
+    window.location.hash = "";
+  };
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash.slice(1);
+      setCurrentPath(hash || "/bookings/list");
+    };
+
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
+  }, []);
+
+  if (!isLoggedIn) {
+    return (
+      <>
+        <Login onLogin={() => setIsLoggedIn(true)} />
+        <ZoomControl />
+        <NavSwitcher />
+      </>
+    );
+  }
+
+  // Extract path without query parameters for routing
+  const routePath = currentPath.split('?')[0];
+
+  const renderPage = () => {
+    switch (routePath) {
+      case "/dashboard":
+        return <Dashboard />;
+      case "/dashboard-v2":
+        return <Dashboard2 />;
+      case "/bookings":
+        navigate("/bookings/list");
+        return <BookingList onNavigate={navigate} />;
+      case "/bookings/today":
+        return <TodaysBooking onNavigate={navigate} />;
+      case "/bookings/list":
+        return <BookingList onNavigate={navigate} />;
+      case "/training-results":
+        return <TrainingResults onNavigate={navigate} />;
+      case "/training-results/detail":
+        return <TrainingDetail onNavigate={navigate} />;
+      case "/reports/asset-movement":
+        return <AssetMovementReport />;
+      case "/reports/stock-take":
+        return <StockTakeVarianceReport onNavigate={navigate} />;
+      case "/reports/asset-audit":
+        return <AssetsAuditReport />;
+      case "/user-management/user-list":
+        return <UserList onNavigate={navigate} />;
+      case "/user-management/user-detail":
+        return <UserDetail onNavigate={navigate} />;
+      case "/user-management/user-role":
+        return <UserRole />;
+      case "/user-management/role-permission":
+        return <RolePermission />;
+      case "/user-management/rank":
+        return <RankPage />;
+      case "/site-management":
+        return <SiteManagement />;
+      case "/system-hardware/dashboard":
+        return <SHMDashboard />;
+      case "/system-hardware/assets-list":
+        return <AssetsList onNavigate={navigate} />;
+      case "/notifications":
+        return <Notifications />;
+      case "/system-hardware/assignment-list":
+        return <AssignmentList onNavigate={navigate} />;
+      case "/system-hardware/asset-type":
+        return <AssetType />;
+      case "/system-hardware/asset-category":
+        return <AssetCategory />;
+      case "/system-hardware/asset-tracking":
+        return <AssetTracking />;
+      case "/system-hardware/rfid-configuration/reader-listing":
+        return <RFIDReaderListing />;
+      case "/system-hardware/rfid-configuration/antenna-listing":
+        return <AntennaListing />;
+      case "/system-hardware/rfid-configuration":
+        return <RFIDReaderListing />;
+      case "/system-hardware":
+        return <SHMDashboard />;
+      case "/system-health":
+        return <SystemHealth />;
+      case "/operational-availability":
+        return <OperationalAvailability onNavigate={navigate} />;
+      case "/operational-availability-2":
+        return <OperationalAvailability2 />;
+      case "/system-maintenance":
+        return <SystemMaintenance />;
+      case "/data-management/export":
+        return <DataExport />;
+      case "/data-management/import":
+        return <DataImport />;
+      case "/data-management":
+        return <DataExport />;
+      case "/activity-log":
+        return <ActivityLog />;
+      case "/resource-planning":
+        return <ResourcePlanning />;
+      case "/settings":
+        return <Settings />;
+      default:
+        // /system-hardware/asset-detail/:id
+        if (routePath.startsWith("/system-hardware/asset-detail/")) {
+          const assetId = routePath.replace("/system-hardware/asset-detail/", "");
+          return <AssetDetail assetId={assetId} onNavigate={navigate} />;
+        }
+        return <Dashboard />;
+    }
+  };
+
+  if (routePath === "/bookings/create") {
+    return <CreateBooking onClose={() => navigate("/bookings/list")} />;
+  }
+
+  if (routePath === "/system-hardware/create-assignment" || routePath === "/system-hardware/assignments/new") {
+    return <CreateAssignment onNavigate={navigate} />;
+  }
+
+  if (routePath === "/system-hardware/asset-creation") {
+    return <AssetCreation onNavigate={navigate} />;
+  }
+
+  if (routePath === "/system-hardware/issue-assets") {
+    return <IssueAssets onNavigate={navigate} />;
+  }
+
+  const THEMED_BG: Partial<Record<NavVer, string>> = {
+    v4: "bg-[#1A3A6B]",
+    v5: "bg-[#1E4A2E]",
+    v6: "bg-[#334155]",
+    v7: "bg-[#0F172A]",
+  };
+
+  const makeSidebar = (activePath: string) => {
+    if (navVersion === "v2")
+      return <SidebarV2 currentPath={activePath} onNavigate={navigate} onLogout={handleLogout} />;
+    if (navVersion === "v3")
+      return <SidebarV3 currentPath={activePath} onNavigate={navigate} onLogout={handleLogout} />;
+    if (navVersion in THEMED_BG)
+      return <SidebarV3 currentPath={activePath} onNavigate={navigate} onLogout={handleLogout} bgColor={THEMED_BG[navVersion]} />;
+    return <Sidebar currentPath={activePath} onNavigate={navigate} />;
+  };
+
+  const SidebarComponent = makeSidebar(currentPath);
+
+  // ── Operational Availability drill-down routes ────────────────────────────
+  // Level 3: /operational-availability/:monthId/:bookingId
+  if (routePath.startsWith("/operational-availability/") && routePath.split("/").length === 4) {
+    const parts     = routePath.split("/");
+    const monthId   = parts[2];
+    const bookingId = parts[3];
+    return (
+      <div className="flex h-screen bg-gray-50 overflow-hidden">
+        {makeSidebar("/operational-availability")}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header onNavigate={navigate} />
+          <OperationalAvailabilityDetail monthId={monthId} bookingId={bookingId} onNavigate={navigate} />
+        </div>
+        <ZoomControl />
+        <NavSwitcher />
+        <VersionFooter />
+      </div>
+    );
+  }
+
+  // Level 2: /operational-availability/:monthId
+  if (routePath.startsWith("/operational-availability/") && routePath.split("/").length === 3) {
+    const monthId = routePath.split("/")[2];
+    return (
+      <div className="flex h-screen bg-gray-50 overflow-hidden">
+        {makeSidebar("/operational-availability")}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header onNavigate={navigate} />
+          <OperationalAvailabilityMonth monthId={monthId} onNavigate={navigate} />
+        </div>
+        <ZoomControl />
+        <NavSwitcher />
+        <VersionFooter />
+      </div>
+    );
+  }
+
+  if (routePath.startsWith("/reports/stock-take/")) {
+    const recordId = routePath.replace("/reports/stock-take/", "");
+    return (
+      <div className="flex h-screen bg-gray-50 overflow-hidden">
+        {makeSidebar("/reports/stock-take")}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header onNavigate={navigate} />
+          <div className="flex-1 overflow-auto bg-gray-50 p-6">
+            <button onClick={() => navigate("/reports/stock-take")} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-brand-primary mb-5 transition-colors">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polyline points="15 18 9 12 15 6"/></svg>
+              Back to Stock Take Variance Report
+            </button>
+            <h1 className="text-xl font-semibold text-brand-primary mb-2">Stock Take Detail #{recordId}</h1>
+            <div className="bg-white rounded-lg border border-gray-200 p-8 text-center text-gray-400 text-sm">
+              Detail view for record #{recordId} — coming soon
+            </div>
+          </div>
+        </div>
+        <ZoomControl />
+        <NavSwitcher />
+        <VersionFooter />
+      </div>
+    );
+  }
+
+  if (routePath === "/bookings/detail") {
+    return (
+      <div className="flex h-screen bg-gray-50 overflow-hidden">
+        {makeSidebar("/bookings/list")}
+        <div className="flex flex-col flex-1 overflow-hidden">
+          <Header onNavigate={navigate} />
+          <BookingDetail />
+        </div>
+        <ZoomControl />
+        <NavSwitcher />
+        <VersionFooter />
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex h-screen bg-gray-50 overflow-hidden">
+      {SidebarComponent}
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <Header onNavigate={navigate} />
+        {renderPage()}
+      </div>
+      <ZoomControl />
+        <NavSwitcher />
+      <VersionFooter />
+    </div>
+  );
+}

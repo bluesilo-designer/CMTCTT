@@ -1,0 +1,651 @@
+import { useState, useRef, useEffect } from "react";
+import { Pagination } from "@/components/ui/Pagination";
+import { assignments } from "@/data/systemHardware";
+import type { Assignment, AssignmentStatus } from "@/data/systemHardware";
+import { Search, ChevronDown, MoreVertical, Calendar, Eye, PackageCheck, ArrowRightToLine, CheckCircle2, X, Database } from "lucide-react";
+import { SortIcon, type SortDir, nextSort, sortBy } from "@/lib/sortUtils";
+import { cn } from "@/lib/utils";
+
+const PER_PAGE = 10;
+
+const TABS = ["Overall", "Issued", "Pending Return", "Returned", "Not Returned", "Missing"] as const;
+type Tab = (typeof TABS)[number];
+
+const TAB_STATUS_MAP: Partial<Record<Tab, AssignmentStatus>> = {
+  Issued: "Issued",
+  "Pending Return": "Pending Return",
+  Returned: "Returned",
+  "Not Returned": "Not Returned",
+  Missing: "Missing",
+};
+
+/* ── Dummy booking details for the child table ─────────────────────── */
+interface BookingDetail {
+  program: string;
+  bookingId: string;
+  trainingType: string;
+  trainingMode: string;
+  bookingTime: string;
+  status: string;
+  trainees: number;
+}
+
+const BOOKING_DETAILS: Record<string, BookingDetail> = {
+  "BK-2026-001": {
+    program: "IMT Group Training for Unit SR1",
+    bookingId: "#260422-PTC004",
+    trainingType: "Group",
+    trainingMode: "Marksmanship",
+    bookingTime: "22 Apr 2026\n(22 Apr) 8:00 AM – (22 Apr) 12:00 PM (AM Session)",
+    status: "Ongoing",
+    trainees: 30,
+  },
+  "BK-2026-002": {
+    program: "IMT Group Training for Unit 0002",
+    bookingId: "#260423-PTC002",
+    trainingType: "Group",
+    trainingMode: "Marksmanship",
+    bookingTime: "23 Apr 2026\n(23 Apr) 8:00 AM – (23 Apr) 12:00 PM (AM Session)",
+    status: "Upcoming",
+    trainees: 25,
+  },
+  "BK-2026-003": {
+    program: "IMT Group Training for Unit Bravo",
+    bookingId: "#260422-PTC006",
+    trainingType: "Group",
+    trainingMode: "Field Exercise",
+    bookingTime: "22 Apr 2026\n(22 Apr) 1:00 PM – (22 Apr) 5:00 PM (PM Session)",
+    status: "Upcoming",
+    trainees: 18,
+  },
+  "BK-2026-004": {
+    program: "IMT Group Training for Unit Charlie",
+    bookingId: "#260422-PTC007",
+    trainingType: "Group",
+    trainingMode: "Marksmanship",
+    bookingTime: "22 Apr 2026\n(22 Apr) 9:00 AM – (22 Apr) 11:00 AM (Ad-Hoc Schedule)",
+    status: "Pending Return",
+    trainees: 12,
+  },
+  "BK-2026-005": {
+    program: "IMT Group Training for Unit Delta",
+    bookingId: "#260423-PTC003",
+    trainingType: "Group",
+    trainingMode: "Marksmanship",
+    bookingTime: "23 Apr 2026\n(23 Apr) 8:00 AM – (23 Apr) 10:00 AM (Ad-Hoc Schedule)",
+    status: "Completed",
+    trainees: 20,
+  },
+  "BK-2026-006": {
+    program: "IMT Group Training for Unit Echo",
+    bookingId: "#260423-PTC004",
+    trainingType: "Group",
+    trainingMode: "Field Exercise",
+    bookingTime: "23 Apr 2026\n(23 Apr) 1:00 PM – (23 Apr) 5:00 PM (PM Session)",
+    status: "Completed",
+    trainees: 22,
+  },
+  "BK-2026-007": {
+    program: "IMT Group Training for Unit Foxtrot",
+    bookingId: "#260424-PTC001",
+    trainingType: "Group",
+    trainingMode: "Field Exercise",
+    bookingTime: "24 Apr 2026\n(24 Apr) 8:00 AM – (24 Apr) 12:00 PM (AM Session)",
+    status: "Completed",
+    trainees: 15,
+  },
+  "BK-2026-008": {
+    program: "IMT Group Training for Unit Golf",
+    bookingId: "#260425-PTC001",
+    trainingType: "Group",
+    trainingMode: "Marksmanship",
+    bookingTime: "25 Apr 2026\n(25 Apr) 8:00 AM – (25 Apr) 12:00 PM (AM Session)",
+    status: "Ongoing",
+    trainees: 28,
+  },
+  "BK-2026-009": {
+    program: "IMT Group Training for Unit Hotel",
+    bookingId: "#260426-PTC001",
+    trainingType: "Group",
+    trainingMode: "Marksmanship",
+    bookingTime: "26 Apr 2026\n(26 Apr) 8:00 AM – (26 Apr) 10:00 AM (Ad-Hoc Schedule)",
+    status: "Completed",
+    trainees: 10,
+  },
+};
+
+// ── Ready for Return Modal ────────────────────────────────────────────────────
+
+function ReadyForReturnModal({ candidates, onClose }: { candidates: Assignment[]; onClose: () => void }) {
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const allSelected = candidates.length > 0 && selected.size === candidates.length;
+
+  const toggleAll = () =>
+    setSelected(allSelected ? new Set() : new Set(candidates.map((a) => a.id)));
+
+  const toggleOne = (id: string) =>
+    setSelected((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh]">
+        {/* Header */}
+        <div className="flex items-start gap-4 px-8 pt-8 pb-5 border-b border-gray-100">
+          <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+            <CheckCircle2 size={28} className="text-green-500" strokeWidth={1.8} />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-lg font-bold text-gray-800 leading-tight">
+              Select Assignment For Ready To Return
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">Please select at least one assignment</p>
+          </div>
+          <button
+            onClick={onClose}
+            className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* Table */}
+        <div className="flex-1 overflow-auto">
+          <table className="w-full">
+            <thead>
+              <tr className="bg-red-50 border-b border-gray-100 sticky top-0">
+                <th className="px-5 py-3 w-12">
+                  <span
+                    onClick={toggleAll}
+                    className={cn(
+                      "w-4 h-4 rounded border-2 flex items-center justify-center cursor-pointer transition-colors",
+                      allSelected
+                        ? "bg-brand-primary border-brand-primary"
+                        : "border-gray-300 bg-white hover:border-gray-400"
+                    )}
+                  >
+                    {allSelected && (
+                      <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                        <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                    )}
+                  </span>
+                </th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-10">No</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[160px]">Assignment ID</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">Assignment Type</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[120px]">Booking(s)</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[130px]">Assignment status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">Base Station(s)</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[90px]">Asset Qty</th>
+              </tr>
+            </thead>
+            <tbody>
+              {candidates.length === 0 ? (
+                <tr>
+                  <td colSpan={8} className="py-16 text-center">
+                    <div className="flex flex-col items-center gap-3 text-gray-400">
+                      <div className="w-12 h-12 rounded-full bg-gray-100 flex items-center justify-center">
+                        <Database size={22} className="text-gray-400" />
+                      </div>
+                      <p className="text-sm font-semibold text-gray-600">No data to show right now!</p>
+                      <p className="text-xs text-gray-400 max-w-xs text-center">
+                        This table will be automatically updated once users take action in the IMT system.
+                      </p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                candidates.map((asgn, idx) => (
+                  <tr
+                    key={asgn.id}
+                    onClick={() => toggleOne(asgn.id)}
+                    className={cn(
+                      "border-b border-gray-50 cursor-pointer transition-colors",
+                      selected.has(asgn.id) ? "bg-red-50/40" : "hover:bg-gray-50"
+                    )}
+                  >
+                    <td className="px-5 py-3.5">
+                      <span className={cn(
+                        "w-4 h-4 rounded border-2 flex items-center justify-center transition-colors",
+                        selected.has(asgn.id)
+                          ? "bg-brand-primary border-brand-primary"
+                          : "border-gray-300 bg-white"
+                      )}>
+                        {selected.has(asgn.id) && (
+                          <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
+                            <path d="M2 5l2.5 2.5L8 3" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                          </svg>
+                        )}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-gray-600">{idx + 1}</td>
+                    <td className="px-4 py-3.5 text-sm font-semibold text-gray-800">{asgn.assignmentId}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">{asgn.assignmentType}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">
+                      {asgn.bookings.length} Booking{asgn.bookings.length !== 1 ? "s" : ""}
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <AssignmentStatusBadge status={asgn.status} />
+                    </td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">{asgn.baseStations.join(", ")}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-700">
+                      {asgn.assetQty} Asset{asgn.assetQty !== 1 ? "s" : ""}
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="border-t border-gray-100">
+          <Pagination
+            current={1}
+            total={Math.max(1, Math.ceil(candidates.length / 10))}
+            perPage={10}
+            totalItems={candidates.length}
+            onPageChange={() => {}}
+          />
+        </div>
+
+        {/* Footer buttons */}
+        <div className="flex gap-3 px-8 py-5 border-t border-gray-100">
+          <button
+            onClick={onClose}
+            className="flex-1 py-3 rounded-xl text-sm font-semibold text-brand-primary bg-red-50 border border-red-100 hover:bg-red-100 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            disabled={selected.size === 0}
+            className={cn(
+              "flex-1 py-3 rounded-xl text-sm font-semibold transition-colors",
+              selected.size > 0
+                ? "bg-brand-primary hover:bg-brand-primary-hover text-white"
+                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+            )}
+          >
+            Confirm
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function BookingStatusPill({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    Ongoing:        "text-orange-600",
+    Upcoming:       "text-blue-500",
+    Completed:      "text-green-600",
+    Overdue:        "text-red-500",
+    "Pending Return": "text-orange-500",
+    "Not Returned": "text-red-500",
+  };
+  return (
+    <span className={cn("text-sm font-semibold", styles[status] ?? "text-gray-600")}>
+      {status}
+    </span>
+  );
+}
+
+function AssignmentStatusBadge({ status }: { status: AssignmentStatus }) {
+  const styles: Record<AssignmentStatus, string> = {
+    Issued:           "bg-purple-50 text-purple-600 border-purple-200",
+    Returned:         "bg-green-50 text-green-600 border-green-200",
+    "Pending Return": "bg-orange-50 text-orange-500 border-orange-200",
+    "Not Returned":   "bg-red-50 text-red-500 border-red-200",
+    Missing:          "bg-gray-100 text-gray-600 border-gray-200",
+  };
+  return (
+    <span className={cn("inline-flex items-center rounded-full border text-xs font-medium px-2.5 py-0.5", styles[status])}>
+      {status}
+    </span>
+  );
+}
+
+export function AssignmentList({ onNavigate }: { onNavigate?: (path: string) => void }) {
+  const [activeTab, setActiveTab] = useState<Tab>("Overall");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortField, setSortField] = useState("");
+  const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showReturnModal, setShowReturnModal] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  const returnCandidates = assignments.filter(
+    (a) => a.status === "Issued" || a.status === "Pending Return"
+  );
+
+  // Close context menu on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const tabCounts = TABS.reduce((acc, tab) => {
+    acc[tab] = tab === "Overall"
+      ? assignments.length
+      : assignments.filter((a) => a.status === TAB_STATUS_MAP[tab]).length;
+    return acc;
+  }, {} as Record<Tab, number>);
+
+  const tabFiltered = activeTab === "Overall"
+    ? assignments
+    : assignments.filter((a) => a.status === TAB_STATUS_MAP[activeTab]);
+
+  const filtered = tabFiltered.filter(
+    (a) => !searchQuery || a.assignmentId.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleSort = (field: string) => {
+    const s = nextSort(sortField, field, sortDir);
+    setSortField(s.field);
+    setSortDir(s.dir);
+    setCurrentPage(1);
+  };
+
+  const sorted = sortField ? sortBy(filtered, sortField as any, sortDir) : filtered;
+  const totalPages = Math.max(1, Math.ceil(sorted.length / PER_PAGE));
+  const paginated = sorted.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
+
+  const toggleExpand = (id: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+    setCurrentPage(1);
+  };
+
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50">
+      {showReturnModal && <ReadyForReturnModal candidates={returnCandidates} onClose={() => setShowReturnModal(false)} />}
+
+      <div className="p-4 md:p-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-5 gap-3">
+          <h1 className="text-xl font-semibold text-brand-primary">Assignment List</h1>
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3">
+            {returnCandidates.length > 0 && (
+              <button
+                onClick={() => setShowReturnModal(true)}
+                className="px-4 py-2 text-sm border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-semibold transition-colors"
+              >
+                Ready for Return Assets
+              </button>
+            )}
+            <button
+              onClick={() => onNavigate?.("/system-hardware/create-assignment")}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm bg-brand-primary text-white rounded-lg hover:bg-brand-primary/90 font-semibold shadow-sm transition-colors"
+            >
+              <span className="text-base leading-none">+</span>
+              Issue Assets
+            </button>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg border border-gray-200">
+          {/* Tabs + Search/Filter on same row */}
+          <div className="flex items-center justify-between border-b border-gray-100 px-5">
+            {/* Tab buttons */}
+            <div className="flex overflow-x-auto">
+              {TABS.map((tab) => {
+                const count = tabCounts[tab] ?? 0;
+                return (
+                  <button
+                    key={tab}
+                    onClick={() => handleTabChange(tab)}
+                    className={cn(
+                      "flex items-center gap-1.5 px-4 py-3 text-sm font-medium whitespace-nowrap transition-colors relative",
+                      activeTab === tab ? "text-brand-primary" : "text-gray-500 hover:text-gray-700"
+                    )}
+                  >
+                    {tab}
+                    {count > 0 && (
+                      <span className={cn(
+                        "inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] font-bold",
+                        activeTab === tab ? "bg-brand-primary text-white" : "bg-gray-100 text-gray-500"
+                      )}>
+                        {count}
+                      </span>
+                    )}
+                    {activeTab === tab && (
+                      <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-brand-primary rounded-t-full" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Search + Date filter */}
+            <div className="flex items-center gap-2 flex-shrink-0 ml-4">
+              <div className="relative">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                  className="pl-8 pr-3 py-1.5 text-sm border border-gray-200 rounded-md w-48 focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+                />
+              </div>
+              <button className="flex items-center gap-2 px-3 py-1.5 text-sm border border-gray-200 rounded-md text-gray-600 hover:bg-gray-50 whitespace-nowrap">
+                <Calendar size={14} className="text-gray-400" />
+                Select Date
+              </button>
+            </div>
+          </div>
+
+          {/* Table */}
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[900px]">
+              <thead>
+                <tr className="bg-red-50 border-b border-gray-100">
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-12">No</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[160px]">
+                    <button onClick={() => handleSort("assignmentId")} className="flex items-center gap-1 hover:text-brand-primary-hover transition-colors">
+                      Assignment ID <SortIcon active={sortField === "assignmentId"} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">Assignment Type</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[160px]">Booking(s)</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[130px]">Assignment Status</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[150px]">Base Station(s)</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[100px]">Asset Qty</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">
+                    <button onClick={() => handleSort("issuedDate")} className="flex items-center gap-1 hover:text-brand-primary-hover transition-colors">
+                      Issued Date <SortIcon active={sortField === "issuedDate"} dir={sortDir} />
+                    </button>
+                  </th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary min-w-[140px]">Returned Date</th>
+                  <th className="text-left px-4 py-3 text-xs font-semibold text-brand-primary w-20">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {paginated.map((asgn, idx) => {
+                  const isExpanded = expanded.has(asgn.id);
+                  const bookingCount = asgn.bookings.length;
+                  const parentNo = (currentPage - 1) * PER_PAGE + idx + 1;
+                  return (
+                    <>
+                      {/* ── Main row ── */}
+                      <tr
+                        key={asgn.id}
+                        className={cn(
+                          "border-b transition-colors",
+                          isExpanded ? "border-gray-200 bg-gray-50/60" : "border-gray-50 hover:bg-gray-50"
+                        )}
+                      >
+                        <td className="px-4 py-3.5 text-sm text-gray-700">
+                          {(currentPage - 1) * PER_PAGE + idx + 1}
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-gray-800 font-semibold">{asgn.assignmentId}</td>
+                        <td className="px-4 py-3.5 text-sm text-gray-700">{asgn.assignmentType}</td>
+                        <td className="px-4 py-3.5 text-sm text-gray-700">
+                          {bookingCount} Booking{bookingCount !== 1 ? "s" : ""}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <AssignmentStatusBadge status={asgn.status} />
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-gray-700">
+                          {asgn.baseStations.join(", ")}
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-gray-700">{asgn.assetQty} Asset{asgn.assetQty !== 1 ? "s" : ""}</td>
+                        <td className="px-4 py-3.5 text-sm text-gray-700 whitespace-pre-line leading-snug">
+                          {asgn.issuedDate ?? "—"}
+                        </td>
+                        <td className="px-4 py-3.5 text-sm text-gray-700 whitespace-pre-line leading-snug">
+                          {asgn.returnedDate ?? <span className="text-gray-300">—</span>}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => toggleExpand(asgn.id)}
+                              className="p-1 text-gray-400 hover:text-gray-600 transition-colors rounded"
+                            >
+                              <ChevronDown
+                                size={16}
+                                className={cn("transition-transform duration-200", isExpanded && "rotate-180")}
+                              />
+                            </button>
+                            {/* Context menu */}
+                            <div className="relative" ref={openMenuId === asgn.id ? menuRef : undefined}>
+                              <button
+                                onClick={() => setOpenMenuId(openMenuId === asgn.id ? null : asgn.id)}
+                                className={cn(
+                                  "p-1 rounded border transition-colors",
+                                  openMenuId === asgn.id
+                                    ? "border-brand-primary text-brand-primary bg-red-50"
+                                    : "border-transparent text-gray-400 hover:text-gray-600 hover:border-gray-200"
+                                )}
+                              >
+                                <MoreVertical size={16} />
+                              </button>
+                              {openMenuId === asgn.id && (
+                                <div className="absolute right-0 top-full mt-1 w-52 bg-white border border-gray-200 rounded-xl shadow-xl z-50 py-1 overflow-hidden">
+                                  <button
+                                    onClick={() => { setOpenMenuId(null); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <Eye size={15} className="text-gray-400" />
+                                    View Details
+                                  </button>
+                                  <button
+                                    onClick={() => { setOpenMenuId(null); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <PackageCheck size={15} className="text-gray-400" />
+                                    Return Assets
+                                  </button>
+                                  <button
+                                    onClick={() => { setOpenMenuId(null); }}
+                                    className="w-full flex items-center gap-3 px-4 py-2.5 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                                  >
+                                    <ArrowRightToLine size={15} className="text-gray-400" />
+                                    Top Up Assets
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* ── Expanded child table ── */}
+                      {isExpanded && (
+                        <tr key={`${asgn.id}-detail`} className="border-b border-gray-100">
+                          <td colSpan={10} className="p-0">
+                            <div className="bg-red-50/30 border-t border-red-100">
+                              <table className="w-full min-w-[900px]">
+                                <thead>
+                                  <tr className="bg-red-50/60 border-b border-red-100">
+                                    <th className="text-left px-6 py-2.5 text-xs font-semibold text-brand-primary w-12">No</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-primary min-w-[220px]">Booking ID</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-primary min-w-[110px]">Training Type</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-primary min-w-[130px]">Training Mode</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-primary min-w-[260px]">Booking Time</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-primary min-w-[110px]">Status</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-primary min-w-[100px]">Unit Name</th>
+                                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-brand-primary w-20">Actions</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {asgn.bookings.map((bkId, bkIdx) => {
+                                    const detail = BOOKING_DETAILS[bkId];
+                                    return (
+                                      <tr
+                                        key={bkId}
+                                        className={cn(
+                                          "transition-colors hover:bg-red-50/40",
+                                          bkIdx < asgn.bookings.length - 1 && "border-b border-red-100/60"
+                                        )}
+                                      >
+                                        <td className="px-6 py-3 text-sm text-gray-500">{parentNo}-{bkIdx + 1}</td>
+                                        <td className="px-4 py-3">
+                                          <p className="text-sm font-medium text-gray-800 leading-snug">
+                                            {detail?.program ?? bkId}
+                                          </p>
+                                          <p className="text-xs text-gray-400 mt-0.5">
+                                            Booking ID - {detail?.bookingId ?? bkId}
+                                          </p>
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-700">{detail?.trainingType ?? "—"}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-700">{detail?.trainingMode ?? "—"}</td>
+                                        <td className="px-4 py-3 text-sm text-gray-700 whitespace-pre-line leading-snug">
+                                          {detail?.bookingTime ?? "—"}
+                                        </td>
+                                        <td className="px-4 py-3">
+                                          {detail ? <BookingStatusPill status={detail.status} /> : <span className="text-gray-400 text-sm">—</span>}
+                                        </td>
+                                        <td className="px-4 py-3 text-sm text-gray-700">{detail?.trainees ?? "—"}</td>
+                                        <td className="px-4 py-3">
+                                          <button
+                                            className="p-1.5 text-gray-400 hover:text-brand-primary hover:bg-red-50 rounded-lg transition-colors"
+                                            title="View booking details"
+                                          >
+                                            <Eye size={15} />
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          <Pagination
+            current={currentPage}
+            total={totalPages}
+            perPage={PER_PAGE}
+            totalItems={sorted.length}
+            onPageChange={setCurrentPage}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
