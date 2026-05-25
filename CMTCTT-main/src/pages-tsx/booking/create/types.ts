@@ -1,5 +1,5 @@
 export type SessionType = "Standalone" | "Integrated";
-export type ProgramType = "SWT" | "CMT" | "CTT" | null;
+export type ProgramType = "SWT" | "CMT" | "CTT" | "CMT+CTT" | null;
 export type TrainingType = "Individual" | "Group" | null;
 export type DryRun = "Yes" | "No" | null;
 export type StationType = "Base Station" | "C-Shaped Station";

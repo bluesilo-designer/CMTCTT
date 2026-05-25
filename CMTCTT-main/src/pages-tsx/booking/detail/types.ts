@@ -41,6 +41,7 @@ export interface Booking {
   assignmentId: string;
   atmsFile: string;
   isIntegrated: boolean;
+  isCMT?: boolean;
   weapons: WeaponEntry[];
   baseStations: StationEntry[];
   cShapedStations: StationEntry[];

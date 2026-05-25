@@ -16,7 +16,9 @@ import {
   ChevronRight,
   Shield,
   Boxes,
+  DoorOpen,
 } from "lucide-react";
+
 import logoImt from "@/assets/logoimt.png";
 
 interface NavItem {
@@ -90,7 +92,8 @@ const navItems: NavItem[] = [
       { label: "Rank",            icon: <></>, path: "/user-management/rank"            },
     ],
   },
-  { label: "Site Management", icon: <MapPin size={18} />, path: "/site-management" },
+  { label: "Site Management",    icon: <MapPin size={18} />,     path: "/site-management"    },
+  { label: "Cabin Management",   icon: <DoorOpen size={18} />,   path: "/cabin-management"   },
   { label: "System Health",   icon: <Activity size={18} />, path: "/system-health"  },
   { label: "System Maintenance", icon: <Wrench size={18} />, path: "/system-maintenance" },
   {

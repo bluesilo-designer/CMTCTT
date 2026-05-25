@@ -6,15 +6,19 @@ import { BookingDetailsStep } from "./components/BookingDetailsStep";
 import { LaneConfigStep } from "./components/LaneConfigStep";
 import { NominalRollStep } from "./components/NominalRollStep";
 import { ScheduleStep } from "./components/ScheduleStep";
+import { CMTBookingDetailsStep } from "./components/CMTBookingDetailsStep";
+import { CMTCabinConfigStep } from "./components/CMTCabinConfigStep";
+import { CMTNominalRollStep } from "./components/CMTNominalRollStep";
 import { ReviewModal } from "./modals/ReviewModal";
-import { PROGRAMS, STEPS, NOMINAL_ROLL_DATA } from "./constants";
+import { PROGRAMS, STEPS, CMT_STEPS, NOMINAL_ROLL_DATA } from "./constants";
 import type { SessionType, ProgramType, BookingDetailsSnapshot, ScheduleSnapshot } from "./types";
+import type { CMTBookingDetailsValues } from "./components/CMTBookingDetailsStep";
 
 // ── Stepper ───────────────────────────────────────────────────────────────────
-function Stepper({ current }: { current: number }) {
+function Stepper({ current, steps = STEPS }: { current: number; steps?: string[] }) {
   return (
     <div className="flex items-center">
-      {STEPS.map((step, idx) => {
+      {steps.map((step, idx) => {
         const isActive = idx === current;
         const isDone = idx < current;
         return (
@@ -28,7 +32,7 @@ function Stepper({ current }: { current: number }) {
               </span>
               {step}
             </div>
-            {idx < STEPS.length - 1 && (
+            {idx < steps.length - 1 && (
               <div className="flex items-center gap-0.5 mx-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-brand-primary/40" />
                 <div className="w-10 border-t-2 border-dashed border-brand-primary/40" />
@@ -108,7 +112,7 @@ function ProgramSelection({ sessionType, setSessionType, onSelect }: {
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full max-w-5xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
         {PROGRAMS.map((prog) => {
           const isHovered = hovered === prog.id;
           return (
@@ -139,7 +143,62 @@ function ProgramSelection({ sessionType, setSessionType, onSelect }: {
   );
 }
 
-// ── Booking Form (step orchestrator) ──────────────────────────────────────────
+// ── CMT Booking Form (3-step: Booking Details → Cabin Configuration → Nominal Roll) ──
+function CMTBookingForm({ sessionType: _sessionType, onBack }: { sessionType: SessionType; onBack: () => void }) {
+  const [step,           setStep]           = useState(0);
+  const [bookingDetails, setBookingDetails] = useState<CMTBookingDetailsValues | null>(null);
+
+  const handleNext = () => {
+    if (step === 0) {
+      // Trigger Formik submit on Booking Details — values bubble up via onNext callback
+      const btn = document.getElementById("cmt-details-next-trigger");
+      if (btn) btn.click();
+      return;
+    }
+    if (step === 1) {
+      setStep(2);
+      return;
+    }
+    // step 2 (Nominal Roll) — open the CMT review modal via hidden trigger
+    const btn = document.getElementById("cmt-nominal-next-trigger");
+    if (btn) btn.click();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+      {/* Stepper bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <Button
+          type="outline"
+          onClick={step === 0 ? onBack : () => setStep(step - 1)}
+          className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-gray-700 w-auto border border-gray-300"
+        >
+          <ArrowLeft size={14} /> Back
+        </Button>
+
+        <Stepper current={step} steps={CMT_STEPS} />
+
+        <Button
+          onClick={handleNext}
+          className="flex items-center gap-2 px-5 py-2 text-sm font-medium w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
+        >
+          Next <ArrowRight size={14} />
+        </Button>
+      </div>
+
+      {/* Step content */}
+      {step === 0 && (
+        <CMTBookingDetailsStep
+          onNext={(vals) => { setBookingDetails(vals); setStep(1); }}
+        />
+      )}
+      {step === 1 && <CMTCabinConfigStep bookingDetails={bookingDetails} />}
+      {step === 2 && <CMTNominalRollStep onNext={onBack} />}
+    </div>
+  );
+}
+
+// ── SWT / General Booking Form (4-step) ───────────────────────────────────────
 function BookingForm({ sessionType, onBack }: { sessionType: SessionType; onBack: () => void }) {
   const [step, setStep] = useState(0);
   const [showReviewModal, setShowReviewModal] = useState(false);
@@ -244,6 +303,9 @@ function BookingForm({ sessionType, onBack }: { sessionType: SessionType; onBack
 export function CreateBooking({ onClose }: { onClose: () => void }) {
   const [sessionType, setSessionType] = useState<SessionType>("Standalone");
   const [selectedProgram, setSelectedProgram] = useState<ProgramType>(null);
+
+  const isCMT = selectedProgram === "CMT" || selectedProgram === "CMT+CTT";
+
   return (
     <div className="fixed inset-0 bg-white z-40 flex flex-col">
       <TopBar
@@ -252,9 +314,21 @@ export function CreateBooking({ onClose }: { onClose: () => void }) {
         sessionType={selectedProgram ? sessionType : undefined}
       />
       {!selectedProgram ? (
-        <ProgramSelection sessionType={sessionType} setSessionType={setSessionType} onSelect={setSelectedProgram} />
+        <ProgramSelection
+          sessionType={sessionType}
+          setSessionType={setSessionType}
+          onSelect={setSelectedProgram}
+        />
+      ) : isCMT ? (
+        <CMTBookingForm
+          sessionType={sessionType}
+          onBack={() => setSelectedProgram(null)}
+        />
       ) : (
-        <BookingForm sessionType={sessionType} onBack={() => setSelectedProgram(null)} />
+        <BookingForm
+          sessionType={sessionType}
+          onBack={() => setSelectedProgram(null)}
+        />
       )}
     </div>
   );

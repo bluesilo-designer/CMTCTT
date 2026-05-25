@@ -54,7 +54,7 @@ import { SidebarV3 } from "@/components/layout/SidebarV3";
 import { Notifications } from "@/pages-tsx/notifications";
 import { AssetDetail } from "@/pages-tsx/system-hardware/asset-detail";
 import { AssetCreation } from "@/pages-tsx/system-hardware/asset-creation";
-
+import { CabinManagement } from "@/pages-tsx/cabin-management";
 // Extracted Layout Components
 import { ZoomControl } from "@/components/layout/ZoomControl";
 import { VersionFooter } from "@/components/layout/VersionFooter";
@@ -422,6 +422,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <SiteManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/cabin-management"
+          element={
+            <ProtectedRoute>
+              <CabinManagement />
             </ProtectedRoute>
           }
         />

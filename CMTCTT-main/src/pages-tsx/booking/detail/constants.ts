@@ -1,3 +1,39 @@
+// ── CMT Onboarding trainees ───────────────────────────────────────────────────
+export interface CMTTraineeRow {
+  rank: string; name: string; nric: string;
+  battalion: string; company: string; section: string;
+  appointment: string; platoon: string; roles: string;
+}
+
+export const CMT_ONBOARDING_TRAINEES: CMTTraineeRow[] = [
+  { rank: "REC", name: "Roger Botosh",     nric: "*****212A", battalion: "1st", company: "AA", section: "1", appointment: "-", platoon: "Platoon 1", roles: "VO" },
+  { rank: "REC", name: "Davis Culhane",    nric: "*****212A", battalion: "2nd", company: "BB", section: "2", appointment: "-", platoon: "Platoon 1", roles: "VC" },
+  { rank: "REC", name: "Kadin Torff",      nric: "*****212A", battalion: "3rd", company: "CC", section: "3", appointment: "-", platoon: "Platoon 1", roles: "TC" },
+  { rank: "REC", name: "Craig Septimus",   nric: "*****212A", battalion: "5th", company: "DD", section: "4", appointment: "-", platoon: "Platoon 1", roles: "VO" },
+  { rank: "REC", name: "Roger Septimus",   nric: "*****212A", battalion: "8th", company: "AA", section: "5", appointment: "-", platoon: "Platoon 1", roles: "SC" },
+  { rank: "REC", name: "Jaxson Donin",     nric: "*****212A", battalion: "9th", company: "BB", section: "1", appointment: "-", platoon: "Platoon 1", roles: "TC" },
+  { rank: "REC", name: "James Lubin",      nric: "*****212A", battalion: "1st", company: "CC", section: "2", appointment: "-", platoon: "Platoon 1", roles: "SO" },
+  { rank: "REC", name: "Jakob Vaccaro",    nric: "*****212A", battalion: "2nd", company: "DD", section: "3", appointment: "-", platoon: "Platoon 1", roles: "SC" },
+  { rank: "REC", name: "Ruben Calzoni",    nric: "*****212A", battalion: "3rd", company: "AA", section: "4", appointment: "-", platoon: "Platoon 1", roles: "TC" },
+  { rank: "REC", name: "Jake Pascal",      nric: "*****212A", battalion: "3rd", company: "AA", section: "4", appointment: "-", platoon: "Platoon 1", roles: "TC" },
+  { rank: "REC", name: "Tyrone Whitfield", nric: "*****212B", battalion: "1st", company: "BB", section: "5", appointment: "-", platoon: "Platoon 2", roles: "VO" },
+  { rank: "REC", name: "Marcus Chen",      nric: "*****212B", battalion: "2nd", company: "CC", section: "1", appointment: "-", platoon: "Platoon 2", roles: "VC" },
+  { rank: "REC", name: "Alvin Tan",        nric: "*****212B", battalion: "3rd", company: "DD", section: "2", appointment: "-", platoon: "Platoon 2", roles: "TC" },
+  { rank: "REC", name: "Wei Ming Lim",     nric: "*****212B", battalion: "5th", company: "AA", section: "3", appointment: "-", platoon: "Platoon 2", roles: "SC" },
+  { rank: "REC", name: "Iskandar Shah",    nric: "*****212B", battalion: "8th", company: "BB", section: "4", appointment: "-", platoon: "Platoon 2", roles: "SO" },
+  { rank: "REC", name: "Rahul Patel",      nric: "*****212B", battalion: "9th", company: "CC", section: "5", appointment: "-", platoon: "Platoon 2", roles: "TC" },
+  { rank: "REC", name: "Dylan Ong",        nric: "*****212C", battalion: "1st", company: "DD", section: "1", appointment: "-", platoon: "Platoon 3", roles: "VO" },
+  { rank: "REC", name: "Brandon Lee",      nric: "*****212C", battalion: "2nd", company: "AA", section: "2", appointment: "-", platoon: "Platoon 3", roles: "VC" },
+  { rank: "REC", name: "Justin Koh",       nric: "*****212C", battalion: "3rd", company: "BB", section: "3", appointment: "-", platoon: "Platoon 3", roles: "TC" },
+  { rank: "REC", name: "Nathan Yeo",       nric: "*****212C", battalion: "5th", company: "CC", section: "4", appointment: "-", platoon: "Platoon 3", roles: "SC" },
+  { rank: "REC", name: "Ethan Ho",         nric: "*****212C", battalion: "8th", company: "DD", section: "5", appointment: "-", platoon: "Platoon 3", roles: "SO" },
+  { rank: "REC", name: "Samuel Ng",        nric: "*****212D", battalion: "9th", company: "AA", section: "1", appointment: "-", platoon: "Platoon 4", roles: "TC" },
+  { rank: "REC", name: "Aaron Lim",        nric: "*****212D", battalion: "1st", company: "BB", section: "2", appointment: "-", platoon: "Platoon 4", roles: "VO" },
+  { rank: "REC", name: "Zachary Tan",      nric: "*****212D", battalion: "2nd", company: "CC", section: "3", appointment: "-", platoon: "Platoon 4", roles: "VC" },
+  { rank: "REC", name: "Gabriel Wong",     nric: "*****212D", battalion: "3rd", company: "DD", section: "4", appointment: "-", platoon: "Platoon 4", roles: "TC" },
+];
+
+// ── SWT bookings mock ─────────────────────────────────────────────────────────
 export const MOCK_ASSIGNMENTS = [
   { id: "#260422-AT001", courseware: "Component Type Training A" },
   { id: "#260422-AT002", courseware: "Component Type Training B" },

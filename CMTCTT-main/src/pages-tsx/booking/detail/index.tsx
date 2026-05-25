@@ -4,6 +4,7 @@ import { useBookingStore } from "./store/useBookingStore";
 import { NominalRollTable } from "./components/NominalRollTable";
 import { LaneConfigTable } from "./components/LaneConfigTable";
 import { OnboardingFlow } from "./components/OnboardingFlow";
+import { CMTOnboardingFlow } from "./components/CMTOnboardingFlow";
 import { ReissueModal } from "./modals/ReissueModal";
 import { AddTraineeModal } from "./modals/AddTraineeModal";
 import { Button } from "@/components/button";
@@ -128,23 +129,25 @@ export function BookingDetail() {
     assignmentId: selectedBooking.assignmentId,
     atmsFile: "202412231456",
     isIntegrated: false,
+    isCMT: true,
   } : {
     ...BOOKING_DATA,
     id: "#111024-KC0004",
-    title: "SWT Training for Unit 19",
+    title: "CMT Training for Unit 10",
     status: "Upcoming",
     date: "10 January 2025",
     time: "08:00 AM – 06:00 PM (Full Day)",
-    program: "SWT Training",
+    program: "CMT Training",
     trainingMode: "Collective",
     briefingRoom: "Briefing Room",
     sectionType: "Standalone",
     courseware: "Component Type Training B",
-    traineesCount: 32,
+    traineesCount: 25,
     trainingType: "Group",
     assignmentId: "-",
     atmsFile: "202412231456",
     isIntegrated: false,
+    isCMT: true,
   }, [selectedBooking]);
 
   useEffect(() => {
@@ -152,7 +155,9 @@ export function BookingDetail() {
   }, [BOOKING, setBooking]);
 
   if (showOnboarding) {
-    return <OnboardingFlow onClose={() => setShowOnboarding(false)} />;
+    return BOOKING.isCMT
+      ? <CMTOnboardingFlow onClose={() => setShowOnboarding(false)} />
+      : <OnboardingFlow    onClose={() => setShowOnboarding(false)} />;
   }
 
   return (
