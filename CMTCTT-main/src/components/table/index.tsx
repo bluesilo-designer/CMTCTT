@@ -34,6 +34,8 @@ export interface TableCustomProps<TData> {
   virtualized?: boolean;
   virtualRowHeight?: number;
   virtualOverscan?: number;
+  /** Optional per-row class — when set, td background inherits from tr */
+  getRowClass?: (row: TData) => string;
 }
 
 export function TableCustom<TData>({
@@ -58,6 +60,7 @@ export function TableCustom<TData>({
   virtualized = false,
   virtualRowHeight = 60,
   virtualOverscan = 8,
+  getRowClass,
 }: TableCustomProps<TData>) {
   const normalizedColumns = useMemo(() => {
     const usedIds = new Map<string, number>();
@@ -280,15 +283,22 @@ export function TableCustom<TData>({
                       </tr>
                     );
                   })
-                : rows.map((row, rowIndex) => (
+                : rows.map((row, rowIndex) => {
+                    const rowExtraClass = getRowClass?.(row.original) ?? "";
+                    return (
                     <Fragment key={row.id}>
-                      <tr className={cn("bg-white hover:bg-gray-50 transition-colors", classTBody)}>
-                        {row.getVisibleCells().map((cell) => (
+                      <tr className={cn("bg-white hover:bg-gray-50 transition-colors", classTBody, rowExtraClass)}>
+                        {row.getVisibleCells().map((cell) => {
+                          const isAction = isStickyAction(cell.column.columnDef);
+                          // Sticky action cells always need explicit bg-white for overlap opacity
+                          const cellBg = isAction || !rowExtraClass ? "bg-white" : "bg-inherit";
+                          return (
                           <td
                             key={cell.id}
                             className={cn(
-                              "h-[60px] bg-white border-b border-[#EAECF0]",
-                              isStickyAction(cell.column.columnDef) ? "px-4 text-center" : "px-7",
+                              "h-[60px] border-b border-[#EAECF0]",
+                              cellBg,
+                              isAction ? "px-4 text-center" : "px-7",
                               freezeRowWhenExpand && expandedRows[row.id] && "sticky top-[56px] z-[200] bg-white border-b border-[#EAECF0]",
                               getStickyClass(cell.column.columnDef),
                               // @ts-ignore
@@ -317,7 +327,8 @@ export function TableCustom<TData>({
                               flexRender(cell.column.columnDef.cell, cell.getContext())
                             )}
                           </td>
-                        ))}
+                          );
+                        })}
                       </tr>
                       {expandedRows[row.id] && getNestedComponent && (
                         <tr>
@@ -327,7 +338,8 @@ export function TableCustom<TData>({
                         </tr>
                       )}
                     </Fragment>
-                  ))}
+                    );
+                  })}
               {isVirtualizationEnabled && virtualPaddingBottom > 0 && (
                 <tr>
                   <td style={{ height: `${virtualPaddingBottom}px` }} colSpan={normalizedColumns.length} />

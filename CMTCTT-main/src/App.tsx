@@ -55,6 +55,7 @@ import { Notifications } from "@/pages-tsx/notifications";
 import { AssetDetail } from "@/pages-tsx/system-hardware/asset-detail";
 import { AssetCreation } from "@/pages-tsx/system-hardware/asset-creation";
 import { CabinManagement } from "@/pages-tsx/cabin-management";
+import { ClusterManagement } from "@/pages-tsx/cluster-management";
 // Extracted Layout Components
 import { ZoomControl } from "@/components/layout/ZoomControl";
 import { VersionFooter } from "@/components/layout/VersionFooter";
@@ -431,6 +432,15 @@ export default function App() {
           element={
             <ProtectedRoute>
               <CabinManagement />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/cluster-management"
+          element={
+            <ProtectedRoute>
+              <ClusterManagement />
             </ProtectedRoute>
           }
         />

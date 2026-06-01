@@ -7,12 +7,18 @@ import { LaneConfigStep } from "./components/LaneConfigStep";
 import { NominalRollStep } from "./components/NominalRollStep";
 import { ScheduleStep } from "./components/ScheduleStep";
 import { CMTBookingDetailsStep } from "./components/CMTBookingDetailsStep";
-import { CMTCabinConfigStep } from "./components/CMTCabinConfigStep";
+import { CMTCabinConfigStep, CMTCTT_INITIAL_CABINS } from "./components/CMTCabinConfigStep";
 import { CMTNominalRollStep } from "./components/CMTNominalRollStep";
+import { CMTCTTBookingDetailsStep } from "./components/CMTCTTBookingDetailsStep";
+import { CMTCTTClusterConfigStep } from "./components/CMTCTTClusterConfigStep";
+import { CMTCTTNominalRollStep } from "./components/CMTCTTNominalRollStep";
+import { CTTBookingDetailsStep } from "./components/CTTBookingDetailsStep";
 import { ReviewModal } from "./modals/ReviewModal";
-import { PROGRAMS, STEPS, CMT_STEPS, NOMINAL_ROLL_DATA } from "./constants";
+import { PROGRAMS, PROGRAMS_BY_SESSION, STEPS, CMT_STEPS, CTT_STEPS, CMTCTT_STEPS, NOMINAL_ROLL_DATA } from "./constants";
 import type { SessionType, ProgramType, BookingDetailsSnapshot, ScheduleSnapshot } from "./types";
 import type { CMTBookingDetailsValues } from "./components/CMTBookingDetailsStep";
+import type { CMTCTTBookingDetailsValues } from "./components/CMTCTTBookingDetailsStep";
+import type { CTTBookingDetailsValues } from "./components/CTTBookingDetailsStep";
 
 // ── Stepper ───────────────────────────────────────────────────────────────────
 function Stepper({ current, steps = STEPS }: { current: number; steps?: string[] }) {
@@ -90,6 +96,13 @@ function TopBar({ onBack, programLabel, sessionType }: {
   );
 }
 
+// ── Session type tab config ───────────────────────────────────────────────────
+const SESSION_TABS: { type: SessionType; label: string; desc: string }[] = [
+  { type: "Standalone",    label: "Standalone",     desc: "Individual program booking" },
+  { type: "SimIntegrated", label: "Sim Integrated", desc: "CMT or CTT simulation integrated" },
+  { type: "Integrated",    label: "Integrated",     desc: "Combined multi-program booking" },
+];
+
 // ── Program Selection ─────────────────────────────────────────────────────────
 function ProgramSelection({ sessionType, setSessionType, onSelect }: {
   sessionType: SessionType;
@@ -97,34 +110,64 @@ function ProgramSelection({ sessionType, setSessionType, onSelect }: {
   onSelect: (p: ProgramType) => void;
 }) {
   const [hovered, setHovered] = useState<ProgramType>(null);
+
+  // Filter programs based on current session type
+  const allowedIds = PROGRAMS_BY_SESSION[sessionType] ?? [];
+  const visiblePrograms = PROGRAMS.filter(p => allowedIds.includes(p.id));
+
+  // Grid columns: 2 cards → 2 cols, 3 → 3, 4 → 4
+  const gridCols = visiblePrograms.length === 2
+    ? "lg:grid-cols-2"
+    : visiblePrograms.length === 3
+    ? "lg:grid-cols-3"
+    : "lg:grid-cols-4";
+
   return (
     <div className="flex-1 overflow-auto bg-gray-50 flex flex-col items-center py-10 px-6">
       <h1 className="text-xl font-semibold text-brand-primary mb-2">Create New Booking</h1>
       <p className="text-sm text-gray-500 mb-8 text-center max-w-xl">
         Choose your desired Training program to proceed. Click on a card below to explore its details and continue the setup process.
       </p>
+
+      {/* ── Session type tabs ─────────────────────────────── */}
       <div className="flex rounded-full overflow-hidden border border-gray-200 bg-white mb-10 shadow-sm">
-        {(["Standalone", "Integrated"] as SessionType[]).map((type) => (
-          <button key={type} type="button" onClick={() => setSessionType(type)}
-            className={cn("flex items-center gap-2 px-6 py-2.5 text-sm font-medium transition-colors",
-              sessionType === type ? "bg-brand-primary text-white" : "text-gray-600 hover:bg-gray-50")}>
-            <Users size={15} />{type}
+        {SESSION_TABS.map(({ type, label }) => (
+          <button
+            key={type}
+            type="button"
+            onClick={() => { setSessionType(type); setHovered(null); }}
+            className={cn(
+              "flex items-center gap-2 px-6 py-2.5 text-sm font-medium transition-colors",
+              sessionType === type ? "bg-brand-primary text-white" : "text-gray-600 hover:bg-gray-50"
+            )}
+          >
+            <Users size={15} />
+            {label}
           </button>
         ))}
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 w-full max-w-6xl">
-        {PROGRAMS.map((prog) => {
+
+      {/* ── Program cards ─────────────────────────────────── */}
+      <div className={cn("grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-6xl", gridCols)}>
+        {visiblePrograms.map((prog) => {
           const isHovered = hovered === prog.id;
           return (
-            <div key={prog.id}
-              className={cn("relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 h-[480px]",
-                isHovered ? "ring-4 ring-brand-primary shadow-xl" : "shadow-md")}
+            <div
+              key={prog.id}
+              className={cn(
+                "relative rounded-xl overflow-hidden cursor-pointer transition-all duration-200 h-[480px]",
+                isHovered ? "ring-4 ring-brand-primary shadow-xl" : "shadow-md"
+              )}
               onMouseEnter={() => setHovered(prog.id)}
               onMouseLeave={() => setHovered(null)}
-              onClick={() => onSelect(prog.id)}>
+              onClick={() => onSelect(prog.id)}
+            >
               <div className={cn("absolute inset-0 bg-gradient-to-b", prog.bg, isHovered && "opacity-70")} />
               {isHovered && <div className="absolute inset-0 bg-brand-primary/30" />}
-              <div className={cn("absolute left-0 right-0 px-6 transition-all duration-200", isHovered ? "bottom-20" : "bottom-6")}>
+              <div className={cn(
+                "absolute left-0 right-0 px-6 transition-all duration-200",
+                isHovered ? "bottom-20" : "bottom-6"
+              )}>
                 <h3 className="text-white font-semibold text-lg leading-snug mb-1">{prog.title}</h3>
                 <p className="text-white/70 text-sm">{prog.desc}</p>
               </div>
@@ -194,6 +237,128 @@ function CMTBookingForm({ sessionType: _sessionType, onBack }: { sessionType: Se
       )}
       {step === 1 && <CMTCabinConfigStep bookingDetails={bookingDetails} />}
       {step === 2 && <CMTNominalRollStep onNext={onBack} />}
+    </div>
+  );
+}
+
+// ── CMT+CTT Booking Form (4-step: Booking Details → Cabin Config → Cluster Config → Nominal Roll) ──
+function CMTCTTBookingForm({ sessionType: _sessionType, onBack, onComplete }: { sessionType: SessionType; onBack: () => void; onComplete?: () => void }) {
+  const [step,           setStep]           = useState(0);
+  const [bookingDetails, setBookingDetails] = useState<CMTCTTBookingDetailsValues | null>(null);
+
+  const handleNext = () => {
+    if (step === 0) {
+      const btn = document.getElementById("cmtctt-details-next-trigger");
+      if (btn) btn.click();
+      return;
+    }
+    if (step < CMTCTT_STEPS.length - 1) {
+      setStep(step + 1);
+      return;
+    }
+    // step 3 (Nominal Roll) — open review modal via hidden trigger
+    const btn = document.getElementById("cmtctt-nominal-next-trigger");
+    if (btn) btn.click();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+      {/* Stepper bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <Button
+          type="outline"
+          onClick={step === 0 ? onBack : () => setStep(step - 1)}
+          className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-gray-700 w-auto border border-gray-300"
+        >
+          <ArrowLeft size={14} /> Back
+        </Button>
+
+        <Stepper current={step} steps={CMTCTT_STEPS} />
+
+        <Button
+          onClick={handleNext}
+          className="flex items-center gap-2 px-5 py-2 text-sm font-medium w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
+        >
+          Next <ArrowRight size={14} />
+        </Button>
+      </div>
+
+      {/* Step content */}
+      {step === 0 && (
+        <CMTCTTBookingDetailsStep
+          onNext={(vals) => { setBookingDetails(vals); setStep(1); }}
+        />
+      )}
+      {step === 1 && (
+        <CMTCabinConfigStep
+          bookingDetails={null}
+          initialCabins={CMTCTT_INITIAL_CABINS}
+          showCallSign={false}
+          weaponVariantOptions={
+            bookingDetails
+              ? bookingDetails.cmtWeaponVariants
+                  .filter(v => v.selected)
+                  .map(v => `${v.label} (${v.qty})`)
+              : undefined
+          }
+        />
+      )}
+      {step === 2 && <CMTCTTClusterConfigStep bookingDetails={bookingDetails} />}
+      {step === 3 && <CMTCTTNominalRollStep bookingDetails={bookingDetails} onNext={onComplete ?? onBack} />}
+    </div>
+  );
+}
+
+// ── CTT Booking Form (3-step: Booking Details → Cluster Configuration → Nominal Roll) ──
+function CTTBookingForm({ sessionType: _sessionType, onBack }: { sessionType: SessionType; onBack: () => void }) {
+  const [step,           setStep]           = useState(0);
+  const [bookingDetails, setBookingDetails] = useState<CTTBookingDetailsValues | null>(null);
+
+  const handleNext = () => {
+    if (step === 0) {
+      const btn = document.getElementById("ctt-details-next-trigger");
+      if (btn) btn.click();
+      return;
+    }
+    if (step < CTT_STEPS.length - 1) {
+      setStep(step + 1);
+      return;
+    }
+    // step 2 (Nominal Roll) — open review modal via hidden trigger
+    const btn = document.getElementById("cmtctt-nominal-next-trigger");
+    if (btn) btn.click();
+  };
+
+  return (
+    <div className="flex-1 flex flex-col overflow-hidden bg-gray-50">
+      {/* Stepper bar */}
+      <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between flex-shrink-0">
+        <Button
+          type="outline"
+          onClick={step === 0 ? onBack : () => setStep(step - 1)}
+          className="flex items-center gap-2 px-5 py-2 text-sm font-medium text-gray-700 w-auto border border-gray-300"
+        >
+          <ArrowLeft size={14} /> Back
+        </Button>
+
+        <Stepper current={step} steps={CTT_STEPS} />
+
+        <Button
+          onClick={handleNext}
+          className="flex items-center gap-2 px-5 py-2 text-sm font-medium w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
+        >
+          Next <ArrowRight size={14} />
+        </Button>
+      </div>
+
+      {/* Step content */}
+      {step === 0 && (
+        <CTTBookingDetailsStep
+          onNext={(vals) => { setBookingDetails(vals); setStep(1); }}
+        />
+      )}
+      {step === 1 && <CMTCTTClusterConfigStep bookingDetails={bookingDetails as any} />}
+      {step === 2 && <CMTCTTNominalRollStep bookingDetails={bookingDetails as any} onNext={onBack} />}
     </div>
   );
 }
@@ -304,8 +469,6 @@ export function CreateBooking({ onClose }: { onClose: () => void }) {
   const [sessionType, setSessionType] = useState<SessionType>("Standalone");
   const [selectedProgram, setSelectedProgram] = useState<ProgramType>(null);
 
-  const isCMT = selectedProgram === "CMT" || selectedProgram === "CMT+CTT";
-
   return (
     <div className="fixed inset-0 bg-white z-40 flex flex-col">
       <TopBar
@@ -319,10 +482,21 @@ export function CreateBooking({ onClose }: { onClose: () => void }) {
           setSessionType={setSessionType}
           onSelect={setSelectedProgram}
         />
-      ) : isCMT ? (
+      ) : selectedProgram === "CMT" ? (
         <CMTBookingForm
           sessionType={sessionType}
           onBack={() => setSelectedProgram(null)}
+        />
+      ) : selectedProgram === "CTT" ? (
+        <CTTBookingForm
+          sessionType={sessionType}
+          onBack={() => setSelectedProgram(null)}
+        />
+      ) : selectedProgram === "CMT+CTT" ? (
+        <CMTCTTBookingForm
+          sessionType={sessionType}
+          onBack={() => setSelectedProgram(null)}
+          onComplete={onClose}
         />
       ) : (
         <BookingForm

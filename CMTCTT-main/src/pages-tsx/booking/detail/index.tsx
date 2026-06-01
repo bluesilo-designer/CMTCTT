@@ -5,6 +5,7 @@ import { NominalRollTable } from "./components/NominalRollTable";
 import { LaneConfigTable } from "./components/LaneConfigTable";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { CMTOnboardingFlow } from "./components/CMTOnboardingFlow";
+import { CMTCTTOnboardingFlow } from "./components/CMTCTTOnboardingFlow";
 import { ReissueModal } from "./modals/ReissueModal";
 import { AddTraineeModal } from "./modals/AddTraineeModal";
 import { Button } from "@/components/button";
@@ -87,6 +88,7 @@ export function BookingDetail() {
   const [showCoursewarePopup, setShowCoursewarePopup] = useState(false);
   const [showAddTrainee, setShowAddTrainee] = useState(false);
   const [showDotMenu, setShowDotMenu] = useState(false);
+  const [cmtcttActiveTab, setCmtcttActiveTab] = useState("Booking Details");
   const dotMenuRef = useRef<HTMLDivElement>(null);
   const setBooking = useBookingStore((s) => s.setBooking);
 
@@ -124,37 +126,41 @@ export function BookingDetail() {
     briefingRoom: "Briefing Room",
     sectionType: "Standalone",
     courseware: selectedBooking.courseware,
-    traineesCount: 32,
+    traineesCount: selectedBooking.trainees ?? 32,
     trainingType: selectedBooking.trainingType,
     assignmentId: selectedBooking.assignmentId,
     atmsFile: "202412231456",
     isIntegrated: false,
-    isCMT: true,
+    isCMT: selectedBooking.isCMT ?? false,
+    isCMTCTT: selectedBooking.isCMTCTT ?? false,
   } : {
     ...BOOKING_DATA,
     id: "#111024-KC0004",
-    title: "CMT Training for Unit 10",
+    title: "SWT Training for Unit 19",
     status: "Upcoming",
     date: "10 January 2025",
     time: "08:00 AM – 06:00 PM (Full Day)",
-    program: "CMT Training",
-    trainingMode: "Collective",
+    program: "SWT Training",
+    trainingMode: "Marksmanship",
     briefingRoom: "Briefing Room",
     sectionType: "Standalone",
     courseware: "Component Type Training B",
-    traineesCount: 25,
+    traineesCount: 32,
     trainingType: "Group",
     assignmentId: "-",
     atmsFile: "202412231456",
     isIntegrated: false,
-    isCMT: true,
+    isCMT: false,
   }, [selectedBooking]);
 
   useEffect(() => {
     setBooking(BOOKING);
   }, [BOOKING, setBooking]);
 
+  const isCMTCTT = BOOKING.isCMTCTT ?? false;
+
   if (showOnboarding) {
+    if (BOOKING.isCMTCTT) return <CMTCTTOnboardingFlow onClose={() => setShowOnboarding(false)} />;
     return BOOKING.isCMT
       ? <CMTOnboardingFlow onClose={() => setShowOnboarding(false)} />
       : <OnboardingFlow    onClose={() => setShowOnboarding(false)} />;
@@ -229,10 +235,13 @@ export function BookingDetail() {
 
               {["Ongoing", "Upcoming"].includes(BOOKING.status) && (
                 <Button
-                  onClick={() => selectedBooking?.assetIssued && setShowCoursewarePopup(true)}
-                  disabled={!selectedBooking?.assetIssued}
+                  onClick={() => {
+                    if (isCMTCTT) { setShowOnboarding(true); return; }
+                    selectedBooking?.assetIssued && setShowCoursewarePopup(true);
+                  }}
+                  disabled={!isCMTCTT && !selectedBooking?.assetIssued}
                   className={cn("px-5 py-2.5 text-sm font-semibold w-auto",
-                    selectedBooking?.assetIssued
+                    (isCMTCTT || selectedBooking?.assetIssued)
                       ? "bg-brand-primary text-white hover:bg-brand-primary-hover"
                       : "bg-gray-100 text-gray-400 cursor-not-allowed")}
                 >
@@ -249,7 +258,25 @@ export function BookingDetail() {
                   <MoreVertical size={16} />
                 </Button>
 
-                {showDotMenu && BOOKING.status === "Ongoing" && (
+                {showDotMenu && isCMTCTT && (
+                  <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-2 overflow-hidden">
+                    {[
+                      { label: "Cancel", danger: true },
+                      { label: "Reschedule" },
+                      { label: "Return Assets" },
+                      { label: "Manual Issue Assets" },
+                    ].map(({ label, danger }: { label: string; danger?: boolean }) => (
+                      <button key={label} type="button"
+                        onClick={() => setShowDotMenu(false)}
+                        className={cn("w-full flex items-center gap-3 px-4 py-2.5 text-sm transition-colors text-left",
+                          danger ? "text-red-500 hover:bg-red-50" : "text-gray-700 hover:bg-gray-50")}>
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {showDotMenu && !isCMTCTT && BOOKING.status === "Ongoing" && (
                   <div className="absolute right-0 top-full mt-1 w-56 bg-white border border-gray-200 rounded-2xl shadow-xl z-50 py-2 overflow-hidden">
                     {[
                       { icon: <Plus size={15} className="text-gray-600" />, label: "Top up assets" },
@@ -275,7 +302,17 @@ export function BookingDetail() {
 
           {/* Tabs */}
           <div className="flex gap-0 mt-5 border-b border-gray-200 mb-6">
-            {tabs.map((tab: any) => (
+            {isCMTCTT
+              ? ["Booking Details", "Nominal Roll", "Cabin Configuration", "Cluster Configuration", "Assignment List"].map((tab) => (
+                  <button key={tab} type="button" onClick={() => setCmtcttActiveTab(tab)}
+                    className={cn("px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors",
+                      cmtcttActiveTab === tab
+                        ? "border-brand-primary text-brand-primary"
+                        : "border-transparent text-gray-500 hover:text-gray-700")}>
+                    {tab}
+                  </button>
+                ))
+              : tabs.map((tab: any) => (
               <button key={tab} type="button" onClick={() => setActiveTab(tab)}
                 className={cn("px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors",
                   activeTab === tab
@@ -286,8 +323,111 @@ export function BookingDetail() {
             ))}
           </div>
 
+          {/* ── CMT+CTT tab content ─────────────────────────────────────────── */}
+          {isCMTCTT && cmtcttActiveTab === "Booking Details" && (
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="grid grid-cols-3 gap-0 divide-x divide-gray-200">
+                {/* CMT Column */}
+                <div className="pr-6 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-800">CMT</h3>
+                  {[
+                    ["Booking Type", "Entire Cabin"],
+                    ["Main IOS", "Main IOS 3"],
+                    ["Slave IOS", "-"],
+                  ].map(([label, value]) => (
+                    <Field key={label} label={label} value={value} />
+                  ))}
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Cabin</dt>
+                    {["Cabin 1","Cabin 2","Cabin 4","Cabin 6"].map(c => (
+                      <dd key={c} className="text-sm font-semibold text-gray-800">{c}</dd>
+                    ))}
+                  </div>
+                  {[
+                    ["Vehicle Type", "ICV (TERREX)"],
+                    ["Weapon Variant", "40AGL (2), 50HMG (2)"],
+                  ].map(([label, value]) => (
+                    <Field key={label} label={label} value={value} />
+                  ))}
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Roles</dt>
+                    {["VO","VC","TC","SO"].map(r => (
+                      <dd key={r} className="text-sm font-semibold text-gray-800">{r}</dd>
+                    ))}
+                  </div>
+                </div>
+
+                {/* CTT Column */}
+                <div className="px-6 space-y-4">
+                  <h3 className="text-sm font-bold text-gray-800">CTT</h3>
+                  {[
+                    ["Main IOS", "Main IOS 3"],
+                    ["Slave IOS", "Main IOS 2"],
+                  ].map(([label, value]) => (
+                    <Field key={label} label={label} value={value} />
+                  ))}
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Vehicle Type</dt>
+                    {["ICV (TERREX)","Engineer (BRONCO)"].map(v => (
+                      <dd key={v} className="text-sm font-semibold text-gray-800">{v}</dd>
+                    ))}
+                  </div>
+                  {[["Vehicle Variant", "TERREX (COMMANDER)"]].map(([label, value]) => (
+                    <Field key={label} label={label} value={value} />
+                  ))}
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Weapon Variant</dt>
+                    {["40AGL","50HMG","MORTAL"].map(v => (
+                      <dd key={v} className="text-sm font-semibold text-gray-800">{v}</dd>
+                    ))}
+                  </div>
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Roles</dt>
+                    {["VO","VC","TC","SO","SC"].map(r => (
+                      <dd key={r} className="text-sm font-semibold text-gray-800">{r}</dd>
+                    ))}
+                  </div>
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Cluster</dt>
+                    {Array.from({length:16},(_,i)=>`Cluster ${i+1}`).map(c => (
+                      <dd key={c} className="text-sm font-semibold text-gray-800">{c}</dd>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Right column */}
+                <div className="pl-6 space-y-4">
+                  <Field label="Briefing Room" value="Briefing Room A" />
+                  <Field label="Trainee(s)" value="32 Trainee(s)" />
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Cabin</dt>
+                    {["Cabin 1","Cabin 2","Cabin 4","Cabin 6"].map(c => (
+                      <dd key={c} className="text-sm font-semibold text-gray-800">{c}</dd>
+                    ))}
+                  </div>
+                  <Field label="ATMS File" value="202412231456" />
+                  <Field label="Instructor Name" value="Marvin Marched" />
+                  <Field label="Unit Contact Details" value="+65 662 222 2323 • delblugg@gmail.com" />
+                  <div>
+                    <dt className="text-xs text-gray-400 mb-0.5">Operator Name</dt>
+                    <dd className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-brand-primary text-white text-xs flex items-center justify-center font-semibold flex-shrink-0">JJ</div>
+                      <span className="text-sm font-semibold text-gray-800">Jake Jelanski</span>
+                    </dd>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {isCMTCTT && cmtcttActiveTab !== "Booking Details" && (
+            <div className="bg-white rounded-xl border border-gray-200 p-8 text-center text-sm text-gray-400">
+              {cmtcttActiveTab} content
+            </div>
+          )}
+
           {/* Tab: Booking Details */}
-          {activeTab === "Booking Details" && (
+          {!isCMTCTT && activeTab === "Booking Details" && (
             <div className="space-y-5">
               <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
                 <h2 className="text-sm font-bold text-gray-700 mb-5">Training Information</h2>
@@ -365,7 +505,7 @@ export function BookingDetail() {
           )}
 
           {/* Tab: Nominal Rolls */}
-          {activeTab === "Nominal Rolls" && (
+          {!isCMTCTT && activeTab === "Nominal Rolls" && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
                 <div className="relative">
@@ -405,7 +545,7 @@ export function BookingDetail() {
           )}
 
           {/* Tab: Lane Configuration */}
-          {activeTab === "Lane Configuration" && (
+          {!isCMTCTT && activeTab === "Lane Configuration" && (
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100">
                 <h2 className="text-sm font-bold text-gray-700">Lane Configuration</h2>

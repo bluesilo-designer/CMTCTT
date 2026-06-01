@@ -6,11 +6,11 @@ import { InputCustom } from "@/components/input";
 import { Button } from "@/components/button";
 import { Pagination } from "@/components/ui/Pagination";
 import { Breadcrumb } from "@/components/layout/Breadcrumb";
-import { cabins as initialCabins } from "@/data/cabinManagement";
-import type { Cabin } from "./types";
+import { clusters as initialClusters } from "@/data/clusterManagement";
+import type { Cluster } from "./types";
 import { PER_PAGE } from "./constants";
 import { StatusBadge } from "./components/StatusBadge";
-import { ViewCabinModal } from "./modals/ViewCabinModal";
+import { ViewClusterModal } from "./modals/ViewClusterModal";
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ function shortName(name: string): string {
   return name;
 }
 
-function BlackoutCell({ dates }: { dates: Cabin["blackoutDates"] }) {
+function BlackoutCell({ dates }: { dates: Cluster["blackoutDates"] }) {
   if (dates.length === 0)
     return <span className="text-gray-400 text-sm">-</span>;
   const visible = dates.slice(0, 3);
@@ -35,18 +35,18 @@ function BlackoutCell({ dates }: { dates: Cabin["blackoutDates"] }) {
 
 // ── component ─────────────────────────────────────────────────────────────────
 
-export function CabinManagement() {
-  const [cabins]                         = useState<Cabin[]>(initialCabins);
-  const [searchQuery,  setSearchQuery]   = useState("");
-  const [currentPage,  setCurrentPage]   = useState(1);
-  const [viewingCabin, setViewingCabin]  = useState<Cabin | null>(null);
+export function ClusterManagement() {
+  const [clusters]                           = useState<Cluster[]>(initialClusters);
+  const [searchQuery,    setSearchQuery]     = useState("");
+  const [currentPage,    setCurrentPage]     = useState(1);
+  const [viewingCluster, setViewingCluster]  = useState<Cluster | null>(null);
 
   // ── derived ──
   const filtered = useMemo(
-    () => cabins.filter((c) =>
+    () => clusters.filter((c) =>
       !searchQuery || c.name.toLowerCase().includes(searchQuery.toLowerCase())
     ),
-    [cabins, searchQuery]
+    [clusters, searchQuery]
   );
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / PER_PAGE));
@@ -54,11 +54,11 @@ export function CabinManagement() {
   const paginated  = filtered.slice((safePage - 1) * PER_PAGE, safePage * PER_PAGE);
 
   // ── columns ──
-  const columns = useMemo<ColumnDef<Cabin, any>[]>(
+  const columns = useMemo<ColumnDef<Cluster, any>[]>(
     () => [
       {
         accessorKey: "name",
-        header: () => "Cabin",
+        header:      () => "Cluster",
         cell: ({ getValue }: any) => {
           const full  = getValue() as string;
           const short = shortName(full);
@@ -74,7 +74,7 @@ export function CabinManagement() {
       },
       {
         accessorKey: "status",
-        header: () => "Status",
+        header:      () => "Status",
         cell: ({ getValue }: any) => <StatusBadge status={getValue()} />,
       },
       {
@@ -105,7 +105,7 @@ export function CabinManagement() {
           >
             <button
               title="View detail"
-              onClick={() => setViewingCabin(row.original)}
+              onClick={() => setViewingCluster(row.original)}
               className="p-1.5 rounded-lg text-gray-400 hover:text-brand-primary hover:bg-gray-100 transition-colors"
             >
               <Eye size={15} />
@@ -121,13 +121,13 @@ export function CabinManagement() {
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
       <div className="px-6 py-2.5 border-b border-gray-200 bg-white">
-        <Breadcrumb items={["Cabin Management"]} />
+        <Breadcrumb items={["Cluster Management"]} />
       </div>
 
       <div className="p-6">
         {/* Page header */}
         <div className="flex items-center justify-between mb-5">
-          <h1 className="text-xl font-semibold text-gray-800">Cabin Management</h1>
+          <h1 className="text-xl font-semibold text-gray-800">Cluster Management</h1>
           <Button
             type="outline"
             className="flex items-center gap-2 px-4 py-2.5 text-sm border border-gray-200 text-gray-600 hover:bg-gray-50 font-semibold w-auto"
@@ -141,8 +141,8 @@ export function CabinManagement() {
           {/* Card toolbar */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
             <h2 className="text-sm font-bold text-gray-800">
-              Cabin{" "}
-              <span className="text-gray-500 font-normal">({filtered.length} Cabins)</span>
+              Cluster{" "}
+              <span className="text-gray-500 font-normal">({filtered.length} Clusters)</span>
             </h2>
             <div className="flex items-center gap-3">
               <div className="relative">
@@ -176,10 +176,10 @@ export function CabinManagement() {
       </div>
 
       {/* View modal — read-only */}
-      {viewingCabin && (
-        <ViewCabinModal
-          cabin={viewingCabin}
-          onClose={() => setViewingCabin(null)}
+      {viewingCluster && (
+        <ViewClusterModal
+          cluster={viewingCluster}
+          onClose={() => setViewingCluster(null)}
         />
       )}
     </div>

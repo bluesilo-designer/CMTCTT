@@ -1,4 +1,4 @@
-export type SessionType = "Standalone" | "Integrated";
+export type SessionType = "Standalone" | "SimIntegrated" | "Integrated";
 export type ProgramType = "SWT" | "CMT" | "CTT" | "CMT+CTT" | null;
 export type TrainingType = "Individual" | "Group" | null;
 export type DryRun = "Yes" | "No" | null;

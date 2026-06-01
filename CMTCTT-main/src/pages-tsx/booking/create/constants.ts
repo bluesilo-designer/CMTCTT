@@ -1,14 +1,23 @@
 import type { WeaponItem } from "./types";
 
 export const PROGRAMS = [
-  { id: "SWT"     as const, title: "SWT",     desc: "Focused on mastering advanced weapon handling and operations.",     bg: "from-gray-900 via-gray-700 to-gray-800" },
-  { id: "CMT"     as const, title: "CMT",     desc: "Enhances team tactical skills through mission simulations.",         bg: "from-gray-800 via-gray-600 to-gray-700" },
-  { id: "CTT"     as const, title: "CTT",     desc: "Strengthens leadership in strategic planning and operations.",       bg: "from-gray-900 via-gray-700 to-gray-600" },
-  { id: "CMT+CTT" as const, title: "CMT + CTT", desc: "Strengthens leadership in strategic planning and operations.",    bg: "from-gray-800 via-gray-500 to-gray-700" },
+  { id: "SWT"     as const, title: "SWT",       desc: "Focused on mastering advanced weapon handling and operations.",  bg: "from-gray-900 via-gray-700 to-gray-800" },
+  { id: "CMT"     as const, title: "CMT",       desc: "Enhances team tactical skills through mission simulations.",      bg: "from-gray-800 via-gray-600 to-gray-700" },
+  { id: "CTT"     as const, title: "CTT",       desc: "Strengthens leadership in strategic planning and operations.",    bg: "from-gray-900 via-gray-700 to-gray-600" },
+  { id: "CMT+CTT" as const, title: "CMT + CTT", desc: "Combined CMT and CTT integrated training program.",              bg: "from-gray-800 via-gray-500 to-gray-700" },
 ];
 
-export const STEPS     = ["Booking Details", "Lane Configuration", "Nominal Roll", "Schedule"];
-export const CMT_STEPS = ["Booking Details", "Cabin Configuration", "Nominal Roll"];
+/** Which program cards to show per session type */
+export const PROGRAMS_BY_SESSION: Record<string, readonly string[]> = {
+  "Standalone":    ["SWT", "CMT", "CTT"],
+  "SimIntegrated": ["CMT", "CTT"],
+  "Integrated":    ["SWT", "CMT", "CTT", "CMT+CTT"],
+};
+
+export const STEPS        = ["Booking Details", "Lane Configuration", "Nominal Roll", "Schedule"];
+export const CMT_STEPS    = ["Booking Details", "Cabin Configuration", "Nominal Roll"];
+export const CTT_STEPS    = ["Booking Details", "Cluster Configuration", "Nominal Roll"];
+export const CMTCTT_STEPS = ["Booking Details", "Cabin Configuration", "Cluster Configuration", "Nominal Roll"];
 
 export const TRAINING_MODES_BY_TYPE: Record<string, string[]> = {
   Individual: ["Marksmanship"],

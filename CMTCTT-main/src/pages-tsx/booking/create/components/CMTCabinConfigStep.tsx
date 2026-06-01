@@ -11,6 +11,7 @@ interface CabinRow {
   id:            string;
   occupied:      boolean;
   selected:      boolean;
+  callSign:      string;
   weaponVariant: string;
   role:          string;
 }
@@ -26,19 +27,43 @@ const WEAPON_VARIANT_OPTIONS = ["40AGL", "50HMG", "7.62 COAX", "Smoke Discharger
 const ROLE_OPTIONS           = ["All role selected", "Commander", "Gunner", "Driver", "Loader"];
 const FORCE_OPTIONS          = ["Blue", "Red"];
 
+const CALL_SIGN_OPTIONS = [
+  "09", "09Z", "08", "08Z", "07", "01",
+  "06", "06Z", "05", "05Z", "03", "45Z",
+  "81", "81A", "81AZ", "81Z",
+  "83Z", "83A1Z", "83A2Z", "83A3Z", "83A4Z",
+];
+
+/** Default cabin data for Standalone CMT — cabins 11 & 12 are occupied */
 const INITIAL_CABINS: CabinRow[] = [
-  { id: "CMT_CABIN_01", occupied: false, selected: true,  weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_02", occupied: false, selected: true,  weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_03", occupied: true,  selected: false, weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_04", occupied: false, selected: true,  weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_05", occupied: true,  selected: false, weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_06", occupied: false, selected: true,  weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_07", occupied: true,  selected: false, weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_08", occupied: false, selected: true,  weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_09", occupied: true,  selected: false, weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_10", occupied: true,  selected: false, weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_11", occupied: false, selected: false, weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_12", occupied: false, selected: false, weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_11", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_12", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+];
+
+/** Cabin data for CMT+CTT — cabins 11 & 12 are selectable (not occupied) */
+export const CMTCTT_INITIAL_CABINS: CabinRow[] = [
+  { id: "CMT_CABIN_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
+  { id: "CMT_CABIN_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_11", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_CABIN_12", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
 ];
 
 const columnHelper = createColumnHelper<CabinRow>();
@@ -149,20 +174,29 @@ function PanelDropdown({
 
 export function CMTCabinConfigStep({
   bookingDetails,
+  weaponVariantOptions,
+  initialCabins: initialCabinsProp,
+  showCallSign = true,
 }: {
-  bookingDetails?: CMTBookingDetailsValues | null;
+  bookingDetails?:       CMTBookingDetailsValues | null;
+  /** Overrides the default weapon variant list in the cabin table (e.g. for CMT+CTT with qty labels) */
+  weaponVariantOptions?: string[];
+  /** Overrides the default initial cabin data (e.g. CMT+CTT uses CMTCTT_INITIAL_CABINS) */
+  initialCabins?:        CabinRow[];
+  /** Whether to show the Call Sign column (default: true). Set false for CMT+CTT flow. */
+  showCallSign?:         boolean;
 }) {
-  const [cabins,       setCabins]       = useState<CabinRow[]>(INITIAL_CABINS);
+  const [cabins,       setCabins]       = useState<CabinRow[]>(initialCabinsProp ?? INITIAL_CABINS);
   const [mainIOS,      setMainIOS]      = useState("");
   const [force,        setForce]        = useState("");
   const [slaveIOSList, setSlaveIOSList] = useState<SlaveIOSEntry[]>([]);
 
-  // ── Derive Main IOS options from weapon variant quantities ──────────────────
+  // ── Derive Main IOS options from platform variant quantities ─────────────────
   const totalWeaponQty = useMemo(() => {
-    if (!bookingDetails?.vehicleVariants) return 0;
-    return bookingDetails.vehicleVariants
-      .filter(v => v.selected)
-      .reduce((sum, v) => sum + v.qty, 0);
+    if (!bookingDetails?.platformVariants) return 0;
+    return bookingDetails.platformVariants
+      .filter((v: { selected: boolean; qty: number }) => v.selected)
+      .reduce((sum: number, v: { selected: boolean; qty: number }) => sum + v.qty, 0);
   }, [bookingDetails]);
 
   // Generate "Main IOS 1" … "Main IOS N" where N = total weapon qty
@@ -201,6 +235,10 @@ export function CMTCabinConfigStep({
     ));
   }, []);
 
+  const setCallSign = useCallback((id: string, callSign: string) => {
+    setCabins(prev => prev.map(c => c.id === id ? { ...c, callSign } : c));
+  }, []);
+
   const setWeaponVariant = useCallback((id: string, variant: string) => {
     setCabins(prev => prev.map(c => c.id === id ? { ...c, weaponVariant: variant } : c));
   }, []);
@@ -220,43 +258,49 @@ export function CMTCabinConfigStep({
     setSlaveIOSList(prev => prev.filter(s => s.uid !== uid));
 
   // ── Table columns ───────────────────────────────────────────────────────────
-  const columns = useMemo<ColumnDef<CabinRow, any>[]>(() => [
-    columnHelper.display({
-      id: "select",
-      header: () => (
-        <button
-          type="button"
-          onClick={toggleAll}
-          className={cn(
-            "w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors",
-            allSelected
-              ? "bg-brand-primary border-brand-primary"
-              : someSelected
-                ? "bg-brand-primary/30 border-brand-primary/50"
-                : "border-gray-300 hover:border-gray-400"
-          )}
-        >
-          {allSelected  && <Check size={10} className="text-white" strokeWidth={3} />}
-          {someSelected && !allSelected && <span className="w-2 h-px bg-brand-primary" />}
-        </button>
-      ),
-      cell: ({ row }) => (
-        row.original.occupied ? null : (
+  const columns = useMemo<(ColumnDef<CabinRow, any> & { minWidth?: string; maxWidth?: string; width?: string })[]>(() => {
+    const all: (ColumnDef<CabinRow, any> & { minWidth?: string; maxWidth?: string; width?: string })[] = [
+    {
+      ...columnHelper.display({
+        id: "select",
+        header: () => (
           <button
             type="button"
-            onClick={() => toggleCabin(row.original.id)}
+            onClick={toggleAll}
             className={cn(
               "w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors",
-              row.original.selected
+              allSelected
                 ? "bg-brand-primary border-brand-primary"
-                : "border-gray-300 hover:border-gray-400"
+                : someSelected
+                  ? "bg-brand-primary/30 border-brand-primary/50"
+                  : "border-gray-300 hover:border-gray-400"
             )}
           >
-            {row.original.selected && <Check size={10} className="text-white" strokeWidth={3} />}
+            {allSelected  && <Check size={10} className="text-white" strokeWidth={3} />}
+            {someSelected && !allSelected && <span className="w-2 h-px bg-brand-primary" />}
           </button>
-        )
-      ),
-    }),
+        ),
+        cell: ({ row }) => (
+          row.original.occupied ? null : (
+            <button
+              type="button"
+              onClick={() => toggleCabin(row.original.id)}
+              className={cn(
+                "w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors",
+                row.original.selected
+                  ? "bg-brand-primary border-brand-primary"
+                  : "border-gray-300 hover:border-gray-400"
+              )}
+            >
+              {row.original.selected && <Check size={10} className="text-white" strokeWidth={3} />}
+            </button>
+          )
+        ),
+      }),
+      minWidth: "48px",
+      maxWidth: "48px",
+      width:    "48px",
+    },
 
     columnHelper.accessor("id", {
       header: () => "Cabin",
@@ -280,7 +324,7 @@ export function CMTCabinConfigStep({
         <TableDropdown
           value={row.original.weaponVariant}
           onChange={(v) => setWeaponVariant(row.original.id, v)}
-          options={WEAPON_VARIANT_OPTIONS}
+          options={weaponVariantOptions ?? WEAPON_VARIANT_OPTIONS}
           placeholder="Weapon Variant"
         />
       ),
@@ -298,7 +342,24 @@ export function CMTCabinConfigStep({
         />
       ),
     }),
-  ], [allSelected, someSelected, toggleAll, toggleCabin, setWeaponVariant, setRole]);
+
+    columnHelper.display({
+      id:     "callSign",
+      header: () => "Call Sign",
+      cell:   ({ row }) => row.original.occupied ? null : (
+        <TableDropdown
+          value={row.original.callSign}
+          onChange={(v) => setCallSign(row.original.id, v)}
+          options={CALL_SIGN_OPTIONS}
+          placeholder="Call Sign"
+        />
+      ),
+    }),
+    ];
+    return showCallSign
+      ? all
+      : all.filter(col => (col as any).id !== "callSign");
+  }, [allSelected, someSelected, toggleAll, toggleCabin, setCallSign, setWeaponVariant, setRole, weaponVariantOptions, showCallSign]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -325,6 +386,7 @@ export function CMTCabinConfigStep({
             actionSticky={false}
             classTheadTh="!px-4 !py-3 !text-xs"
             classTBodyTd="!px-4 !py-2.5 !h-auto"
+            getRowClass={(row) => row.selected ? "bg-red-50" : ""}
           />
         </div>
 

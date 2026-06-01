@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 import {
   LayoutDashboard, GraduationCap, Users, MapPin,
   Activity, Wrench, Database, ClipboardList,
-  ChevronRight, Shield, Settings, Cpu, FileBarChart, CalendarDays, Boxes, LogOut, DoorOpen,
+  ChevronRight, Shield, Settings, Cpu, FileBarChart, CalendarDays, Boxes, LogOut, DoorOpen, Server,
 } from "lucide-react";
 import logoImt from "@/assets/logoimt.png";
 
@@ -88,7 +88,8 @@ const navGroups: { label: string; items: NavItem[] }[] = [
         ],
       },
       { label: "Site Management",  icon: <MapPin size={16} />,    path: "/site-management"  },
-      { label: "Cabin Management",  icon: <DoorOpen size={16} />,  path: "/cabin-management" },
+      { label: "Cabin Management",   icon: <DoorOpen size={16} />, path: "/cabin-management"   },
+      { label: "Cluster Management", icon: <Server  size={16} />, path: "/cluster-management" },
       {
         label: "Data",
         icon: <Database size={16} />,

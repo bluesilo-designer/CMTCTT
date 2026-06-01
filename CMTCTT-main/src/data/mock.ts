@@ -28,6 +28,8 @@ export interface Booking {
   unitName: string;
   weapon: string;
   assetIssued: boolean;
+  isCMT?: boolean;
+  isCMTCTT?: boolean;
   sectionType?: "Standalone" | "Group";
   assignedStations?: string[];
   trainees?: number;
@@ -153,6 +155,42 @@ export const baseStations: BaseStation[] = [
 
 // Booking List data
 export const bookings: Booking[] = [
+  {
+    id: "cmtctt-1",
+    bookingId: "#111024-KC0004",
+    program: "CMT CTT Training for Unit 19",
+    trainingType: "Group",
+    bookingTime: "10 Jan 2025\n08:00 AM - 12:00 PM (AM Session)",
+    bookingDate: "10 Jan 2025",
+    status: "Upcoming",
+    trainingMode: "Simulation",
+    courseware: "Component Type Training B",
+    assignmentId: "-",
+    unitName: "Unit 19",
+    weapon: "40AGL, 50HMG",
+    assetIssued: true,
+    isCMTCTT: true,
+    sectionType: "Standalone",
+    trainees: 32,
+  },
+  {
+    id: "cmt-1",
+    bookingId: "#260425-CMT001",
+    program: "CMT Training for Unit 10",
+    trainingType: "Group",
+    bookingTime: "25 Apr 2026\n12:00 PM – 05:00 PM (PM Session)",
+    bookingDate: "25 Apr 2026",
+    status: "Upcoming",
+    trainingMode: "Simulation",
+    courseware: "Component Type Training B",
+    assignmentId: "-",
+    unitName: "Unit 10",
+    weapon: "40AGL, 50HMG",
+    assetIssued: true,
+    isCMT: true,
+    sectionType: "Standalone",
+    trainees: 25,
+  },
   {
     id: "1",
     bookingId: "#260422-PTC009",

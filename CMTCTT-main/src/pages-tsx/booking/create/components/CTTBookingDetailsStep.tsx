@@ -6,43 +6,27 @@ import { cn } from "@/lib/utils";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-// Vehicle type is fixed to ICV (TERREX) — auto-selected, no dropdown shown
-const FIXED_VEHICLE_TYPE = "ICV (TERREX)";
+const FIXED_TRAINING_TYPE = "CTT_Standalone";
+const MAX_CLUSTER_AMOUNT  = 64;
 
-const COMPARTMENT_OPTIONS = [
-  "CMT_Driving",
-  "CMT_Gunnery",
-  "CMT_Vehicle",
-  "CMT_Standalone",
-  "CTT_Standalone",
-  "SimIntegrated",
-];
+const CTT_VEHICLE_TYPES = ["ICV", "Armour", "Engineer", "PCSV", "Transport Vehicles"] as const;
 
-/** Selecting one of these deselects everything else; nothing else can be added while one is active */
-const STANDALONE_OPTIONS = new Set(["CMT_Standalone", "CTT_Standalone"]);
+const PLATFORM_OPTIONS_BY_VEHICLE: Record<string, string[]> = {
+  "ICV": [
+    "ICV Commander", "ICV Trooper", "ICV Scout",
+    "ICV Pioneer",   "ICV Medical", "ICV Storm",
+  ],
+  "Armour": ["L2SG", "L2-AEV"],
+  "Engineer": ["M3G", "ATTC-LAMBE"],
+  "PCSV": [
+    "PCSV Mortar", "PCSV Rebro", "PCSV Fuel",
+    "PCSV Bn Casualty Station (BCS)",
+    "PCSV Combat Train (Logistic)",
+    "PCSV FMP (Maintenance)",
+  ],
+  "Transport Vehicles": ["Tonner", "LUV"],
+};
 
-/**
- * Training types that cap cabin amount to 1.
- * CMT_Standalone → up to 11 cabins.
- * Anything else (CTT_Standalone, SimIntegrated) → up to 11 cabins as well.
- */
-const SINGLE_CABIN_TYPES = new Set(["CMT_Gunnery", "CMT_Vehicle", "CMT_Driving"]);
-const MAX_CABIN_STANDALONE = 11;
-
-export interface VariantItem {
-  id:       string;
-  label:    string;
-  selected: boolean;
-  qty:      number;
-}
-
-/** Platform type options for ICV (TERREX) — multi-select + qty */
-const DEFAULT_PLATFORM_VARIANTS: VariantItem[] = [
-  { id: "40AGL", label: "40AGL", selected: false, qty: 1 },
-  { id: "50HMG", label: "50HMG", selected: false, qty: 1 },
-];
-
-const BRIEFING_ROOMS   = ["Briefing Room A", "Briefing Room B", "Briefing Room C", "Briefing Room D"];
 const SCHEDULE_OPTIONS = [
   { value: "AM/PM",    label: "AM/PM Schedule"   },
   { value: "Full Day", label: "Full Day Schedule" },
@@ -52,10 +36,55 @@ const SCHEDULE_SECTIONS = [
   { value: "AM", label: "AM Session (8:00 AM - 12:00 PM)" },
   { value: "PM", label: "PM Session (12:00 PM - 5:00 PM)" },
 ];
+const BRIEFING_ROOMS = [
+  "Briefing Room A", "Briefing Room B",
+  "Briefing Room C", "Briefing Room D",
+];
 
-// ── Compartment multi-select ──────────────────────────────────────────────────
+// ── Types ─────────────────────────────────────────────────────────────────────
 
-function CompartmentSelector({
+export interface PlatformVariantItem {
+  id:          string;
+  label:       string;
+  vehicleType: string;
+  selected:    boolean;
+  qty:         number;
+}
+
+export interface CTTBookingDetailsValues {
+  trainingType:     string;
+  clusterAmount:    number;
+  vehicleTypes:     string[];
+  platformVariants: PlatformVariantItem[];
+  unitName:           string;
+  instructor:         string;
+  unitContactDetails: string;
+  scheduleType:       string | null;
+  scheduleSection:    string | null;
+  briefingRooms:      string[];
+  selectedDate:       Date | null;
+}
+
+// ── Helpers: build platform variants list from vehicle type selection ──────────
+
+function buildPlatformVariants(
+  vehicleTypes: string[],
+  existing: PlatformVariantItem[],
+): PlatformVariantItem[] {
+  const existingMap = new Map(existing.map(v => [v.id, v]));
+  return vehicleTypes.flatMap(vType =>
+    (PLATFORM_OPTIONS_BY_VEHICLE[vType] ?? []).map(label => {
+      const prev = existingMap.get(label);
+      return prev
+        ? { ...prev, vehicleType: vType }                       // keep existing selection/qty
+        : { id: label, label, vehicleType: vType, selected: false, qty: 1 };
+    })
+  );
+}
+
+// ── Vehicle Type multi-checkbox dropdown ──────────────────────────────────────
+
+function VehicleTypeDropdown({
   value, onChange, error,
 }: {
   value: string[]; onChange: (next: string[]) => void; error?: string;
@@ -71,26 +100,8 @@ function CompartmentSelector({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const hasStandaloneSelected = value.some(v => STANDALONE_OPTIONS.has(v));
-  const hasNonStandaloneSelected = value.some(v => !STANDALONE_OPTIONS.has(v));
-
-  const toggle = (opt: string) => {
-    const isChecked    = value.includes(opt);
-    const isStandalone = STANDALONE_OPTIONS.has(opt);
-
-    if (isChecked) {
-      // Always allow deselect
-      onChange(value.filter(v => v !== opt));
-    } else if (isStandalone) {
-      // Standalone selected → clear everything else, select only this
-      onChange([opt]);
-    } else if (hasStandaloneSelected) {
-      // Can't add non-standalone while a standalone is active — no-op
-      return;
-    } else {
-      onChange([...value, opt]);
-    }
-  };
+  const toggle = (opt: string) =>
+    onChange(value.includes(opt) ? value.filter(v => v !== opt) : [...value, opt]);
 
   const summary = value.length > 0 ? value.join(", ") : "";
 
@@ -105,48 +116,30 @@ function CompartmentSelector({
         )}
       >
         <span className={cn("truncate flex-1 text-left", summary ? "text-gray-800" : "text-gray-400")}>
-          {summary || "Select compartments"}
+          {summary || "Select vehicle types"}
         </span>
         <ChevronDown size={14} className={cn("text-gray-400 flex-shrink-0 ml-2 transition-transform", open && "rotate-180")} />
       </button>
-      {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1">
-          {COMPARTMENT_OPTIONS.map(opt => {
-            const checked      = value.includes(opt);
-            const isStandalone = STANDALONE_OPTIONS.has(opt);
-            // Dim option when it cannot be selected:
-            // - a standalone is active and this is a different (non-checked) option
-            // - a non-standalone is active and this standalone is the option
-            const isDisabled =
-              !checked && (
-                (hasStandaloneSelected && !isStandalone) ||
-                (hasNonStandaloneSelected && isStandalone)
-              );
 
+      {open && (
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 max-h-56 overflow-y-auto">
+          {CTT_VEHICLE_TYPES.map(opt => {
+            const checked   = value.includes(opt);
+            const count     = PLATFORM_OPTIONS_BY_VEHICLE[opt]?.length ?? 0;
             return (
               <div
                 key={opt}
-                onClick={() => !isDisabled && toggle(opt)}
-                className={cn(
-                  "flex items-center gap-2 px-3 py-2.5 transition-colors",
-                  isDisabled
-                    ? "cursor-not-allowed opacity-35"
-                    : "hover:bg-gray-50 cursor-pointer"
-                )}
+                className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 cursor-pointer"
+                onClick={() => toggle(opt)}
               >
                 <div className={cn(
                   "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
-                  checked    ? "bg-brand-primary border-brand-primary" :
-                  isDisabled ? "border-gray-200 bg-gray-50"            : "border-gray-300"
+                  checked ? "bg-brand-primary border-brand-primary" : "border-gray-300"
                 )}>
                   {checked && <Check size={10} className="text-white" strokeWidth={3} />}
                 </div>
-                <span className={cn("text-sm", checked ? "text-gray-800 font-medium" : "text-gray-700")}>
-                  {opt}
-                </span>
-                {isStandalone && !isDisabled && !checked && (
-                  <span className="ml-auto text-[10px] text-gray-400 italic">exclusive</span>
-                )}
+                <span className="flex-1 text-sm text-gray-700">{opt}</span>
+                <span className="text-[10px] text-gray-400">{count} platforms</span>
               </div>
             );
           })}
@@ -156,16 +149,15 @@ function CompartmentSelector({
   );
 }
 
-// ── Simple single-select dropdown ─────────────────────────────────────────────
+// ── Platform Type selector (grouped by vehicle type, with qty) ────────────────
 
-/** Multi-select + qty dropdown — Platform Type selector */
-function VariantQtySelector({
-  value, onChange, placeholder, error,
+function PlatformVariantSelector({
+  value, onChange, disabled, error,
 }: {
-  value:       VariantItem[];
-  onChange:    (next: VariantItem[]) => void;
-  placeholder?: string;
-  error?:      string;
+  value:    PlatformVariantItem[];
+  onChange: (next: PlatformVariantItem[]) => void;
+  disabled?: boolean;
+  error?:   string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -178,15 +170,35 @@ function VariantQtySelector({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
+  // Close dropdown when disabled state changes
+  useEffect(() => {
+    if (disabled) setOpen(false);
+  }, [disabled]);
+
   const toggle = (id: string) =>
     onChange(value.map(v => v.id === id ? { ...v, selected: !v.selected } : v));
   const setQty = (id: string, delta: number) =>
     onChange(value.map(v => v.id === id ? { ...v, qty: Math.max(1, v.qty + delta) } : v));
 
-  const selected = value.filter(i => i.selected);
+  const selected = value.filter(v => v.selected);
   const summary  = selected.length > 0
-    ? selected.map(i => `${i.label} (${i.qty})`).join(", ")
+    ? selected.map(v => `${v.label} (${v.qty})`).join(", ")
     : "";
+
+  // Group items by vehicleType preserving order
+  const groups: { vehicleType: string; items: PlatformVariantItem[] }[] = [];
+  CTT_VEHICLE_TYPES.forEach(vt => {
+    const items = value.filter(v => v.vehicleType === vt);
+    if (items.length > 0) groups.push({ vehicleType: vt, items });
+  });
+
+  if (disabled) {
+    return (
+      <div className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-400">
+        Select vehicle type first
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className="relative">
@@ -199,40 +211,58 @@ function VariantQtySelector({
         )}
       >
         <span className={cn("truncate flex-1 text-left", summary ? "text-gray-800" : "text-gray-400")}>
-          {summary || (placeholder ?? "Select platform types")}
+          {summary || "Select platform types"}
         </span>
         <ChevronDown size={14} className={cn("text-gray-400 flex-shrink-0 ml-2 transition-transform", open && "rotate-180")} />
       </button>
+
       {open && (
-        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 max-h-60 overflow-y-auto">
-          {value.map(item => (
-            <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
-              <button
-                type="button"
-                onClick={() => toggle(item.id)}
-                className={cn(
-                  "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
-                  item.selected ? "bg-brand-primary border-brand-primary" : "border-gray-300"
-                )}
-              >
-                {item.selected && <Check size={10} className="text-white" strokeWidth={3} />}
-              </button>
-              <span className={cn("flex-1 text-sm", item.selected ? "text-gray-800 font-medium" : "text-gray-700")}>
-                {item.label}
-              </span>
-              {item.selected && (
-                <div className="flex items-center gap-1">
-                  <button type="button" onClick={() => setQty(item.id, -1)}
-                    className="w-5 h-5 rounded flex items-center justify-center text-brand-primary hover:bg-red-50 border border-brand-primary/30">
-                    <Minus size={10} />
+        <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 max-h-72 overflow-y-auto">
+          {groups.map(({ vehicleType, items }) => (
+            <div key={vehicleType}>
+              {/* Vehicle type group header */}
+              <div className="px-3 py-1.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider bg-gray-50 border-y border-gray-100 sticky top-0">
+                {vehicleType}
+              </div>
+              {items.map(item => (
+                <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
+                  <button
+                    type="button"
+                    onClick={() => toggle(item.id)}
+                    className={cn(
+                      "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                      item.selected ? "bg-brand-primary border-brand-primary" : "border-gray-300"
+                    )}
+                  >
+                    {item.selected && <Check size={10} className="text-white" strokeWidth={3} />}
                   </button>
-                  <span className="w-6 text-center text-sm font-medium text-gray-700">{item.qty}</span>
-                  <button type="button" onClick={() => setQty(item.id, +1)}
-                    className="w-5 h-5 rounded flex items-center justify-center text-brand-primary hover:bg-red-50 border border-brand-primary/30">
-                    <Plus size={10} />
-                  </button>
+                  <span className={cn(
+                    "flex-1 text-sm",
+                    item.selected ? "text-gray-800 font-medium" : "text-gray-700"
+                  )}>
+                    {item.label}
+                  </span>
+                  {item.selected && (
+                    <div className="flex items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setQty(item.id, -1); }}
+                        className="w-5 h-5 rounded flex items-center justify-center text-brand-primary hover:bg-red-50 border border-brand-primary/30"
+                      >
+                        <Minus size={10} />
+                      </button>
+                      <span className="w-6 text-center text-sm font-medium text-gray-700">{item.qty}</span>
+                      <button
+                        type="button"
+                        onClick={(e) => { e.stopPropagation(); setQty(item.id, +1); }}
+                        className="w-5 h-5 rounded flex items-center justify-center text-brand-primary hover:bg-red-50 border border-brand-primary/30"
+                      >
+                        <Plus size={10} />
+                      </button>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
           ))}
         </div>
@@ -304,14 +334,13 @@ function MonthView({ year, month, selected, onSelect }: {
 // ── Validation schema ─────────────────────────────────────────────────────────
 
 const schema = Yup.object({
-  // bookingType is always "Compartment Selection" — no user validation needed
-  compartments: Yup.array().min(1, "Select at least one compartment"),
+  clusterAmount: Yup.number().min(1, "Min 1").max(MAX_CLUSTER_AMOUNT, `Max ${MAX_CLUSTER_AMOUNT}`).required("Required"),
+  vehicleTypes:  Yup.array().of(Yup.string()).min(1, "Select at least one vehicle type"),
   platformVariants: Yup.array().test(
-    "at-least-one",
+    "at-least-one-selected",
     "Select at least one platform type",
-    (items) => (items as VariantItem[] | undefined)?.some(i => i.selected) ?? false
+    (items) => (items as PlatformVariantItem[] | undefined)?.some(i => i.selected) ?? false
   ),
-  vehicleType:        Yup.string().required("Required"),
   unitName:           Yup.string().trim().required("Required"),
   instructor:         Yup.string().trim().required("Required"),
   unitContactDetails: Yup.string().trim().required("Required"),
@@ -324,30 +353,15 @@ const schema = Yup.object({
   briefingRooms: Yup.array().of(Yup.string()).min(1, "Select at least one briefing room"),
 });
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-export interface CMTBookingDetailsValues {
-  bookingType:         string;
-  cabinAmount:         number;
-  compartments:        string[];
-  vehicleType:      string;
-  platformVariants: VariantItem[];
-  unitName:            string;
-  instructor:          string;
-  unitContactDetails:  string;
-  scheduleType:        string | null;
-  scheduleSection:     string | null;
-  briefingRooms:       string[];
-  selectedDate:        Date | null;
-}
+// ── Props ─────────────────────────────────────────────────────────────────────
 
 interface Props {
-  onNext: (values: CMTBookingDetailsValues) => void;
+  onNext: (values: CTTBookingDetailsValues) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function CMTBookingDetailsStep({ onNext }: Props) {
+export function CTTBookingDetailsStep({ onNext }: Props) {
   const [calYear,      setCalYear]      = useState(2025);
   const [calMonth,     setCalMonth]     = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -368,31 +382,27 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
     <div className="flex-1 overflow-auto bg-gray-50 p-6">
       <Formik
         initialValues={{
-          // Booking type is fixed — Compartment Selection is always active
-          bookingType:         "Compartment Selection",
-          cabinAmount:         1,
-          compartments:        [] as string[],
-          vehicleType:      FIXED_VEHICLE_TYPE,   // auto-selected, never changes
-          platformVariants: DEFAULT_PLATFORM_VARIANTS as VariantItem[],
-          unitName:            "",
-          instructor:          "",
-          unitContactDetails:  "",
-          scheduleType:        null as string | null,
-          scheduleSection:     null as string | null,
-          briefingRooms:       [] as string[],
+          trainingType:     FIXED_TRAINING_TYPE,
+          clusterAmount:    1,
+          vehicleTypes:     [] as string[],
+          platformVariants: [] as PlatformVariantItem[],
+          unitName:           "",
+          instructor:         "",
+          unitContactDetails: "",
+          scheduleType:       null as string | null,
+          scheduleSection:    null as string | null,
+          briefingRooms:      [] as string[],
         }}
         validationSchema={schema}
         onSubmit={(values) => { onNext({ ...values, selectedDate }); }}
       >
         {({ values, setFieldValue, errors, touched }) => {
-          // ── Cabin amount rules (from flowchart) ──────────────────
-          const isSingleCabinMode = values.compartments.some(c => SINGLE_CABIN_TYPES.has(c));
-          const maxCabin          = isSingleCabinMode ? 1 : MAX_CABIN_STANDALONE;
+          const noPlatformsAvailable = values.platformVariants.length === 0;
 
           return (
             <Form>
               {/* Hidden submit trigger */}
-              <button type="submit" id="cmt-details-next-trigger" className="hidden" />
+              <button type="submit" id="ctt-details-next-trigger" className="hidden" />
 
               <div className="text-center mb-5">
                 <h2 className="text-base font-semibold text-gray-800">Booking Details</h2>
@@ -404,63 +414,47 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                 {/* ── LEFT COLUMN ─────────────────────────────────── */}
                 <div className="space-y-4">
 
-                  {/* ── Box 1: Booking / Vehicle info ─────────────── */}
-                  <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+                  {/* ── Box 1: CTT Configuration ──────────────────── */}
+                  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
 
-                    {/* Row 1: Training Type | Cabin Amount */}
-                    <div className="grid grid-cols-2 gap-4">
+                    {/* Card header */}
+                    <div className="flex items-center gap-2 px-4 py-3 border-b border-gray-100 bg-gray-50">
+                      <span className="px-2.5 py-0.5 rounded text-xs font-bold bg-blue-600 text-white tracking-wide">
+                        CTT
+                      </span>
+                      <span className="text-sm font-semibold text-gray-700">CTT Configuration</span>
+                    </div>
 
-                      {/* Training Type */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                          Training Type <span className="text-brand-primary">*</span>
-                        </label>
-                        <CompartmentSelector
-                          value={values.compartments}
-                          onChange={(next) => {
-                            setFieldValue("compartments", next);
-                            // Auto-lock cabin to 1 when non-standalone types are selected
-                            const locked = next.some(c => SINGLE_CABIN_TYPES.has(c));
-                            if (locked) setFieldValue("cabinAmount", 1);
-                          }}
-                          error={
-                            touched.compartments && typeof errors.compartments === "string"
-                              ? errors.compartments
-                              : undefined
-                          }
-                        />
-                        {touched.compartments && typeof errors.compartments === "string" && (
-                          <p className="mt-1 text-xs text-red-500">{errors.compartments}</p>
-                        )}
-                      </div>
+                    <div className="p-4 space-y-4">
 
-                      {/* Cabin Amount */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                          Cabin Amount <span className="text-brand-primary">*</span>
-                        </label>
+                      {/* Row 1: Training Type (fixed) | Cluster Amount */}
+                      <div className="grid grid-cols-2 gap-4">
 
-                        {values.compartments.length === 0 ? (
-                          /* Nothing selected yet — greyed placeholder */
-                          <div className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-400">
-                            Select training type first
-                          </div>
-                        ) : isSingleCabinMode ? (
-                          /* Non-standalone types → locked at 1 */
-                          <div className="flex items-center gap-2">
-                            <div className="flex-1 px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700 font-medium">
-                              1 Cabin
-                            </div>
-                            <span className="text-[11px] text-amber-600 font-medium bg-amber-50 border border-amber-200 rounded-md px-2 py-1 whitespace-nowrap">
-                              Max 1
+                        {/* Training Type — fixed, read-only */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Training Type
+                          </label>
+                          <div className="flex items-center gap-2 px-3 py-2.5 border border-gray-200 rounded-lg bg-gray-50">
+                            <span className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold bg-blue-100 text-blue-700 border border-blue-200">
+                              {FIXED_TRAINING_TYPE}
                             </span>
                           </div>
-                        ) : (
-                          /* Standalone / others → stepper up to 11 */
-                          <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
+                        </div>
+
+                        {/* Cluster Amount — stepper up to 64 */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Cluster Amount <span className="text-brand-primary">*</span>
+                          </label>
+                          <div className={cn(
+                            "flex items-center border rounded-lg overflow-hidden",
+                            touched.clusterAmount && errors.clusterAmount
+                              ? "border-red-400" : "border-gray-200"
+                          )}>
                             <button
                               type="button"
-                              onClick={() => setFieldValue("cabinAmount", Math.max(1, values.cabinAmount - 1))}
+                              onClick={() => setFieldValue("clusterAmount", Math.max(1, values.clusterAmount - 1))}
                               className="px-3 py-2.5 border-r border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
                             >
                               <Minus size={13} />
@@ -468,61 +462,71 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                             <input
                               type="text"
                               readOnly
-                              value={values.cabinAmount}
+                              value={values.clusterAmount}
                               className="flex-1 px-3 py-2.5 text-sm text-center text-gray-700 bg-white focus:outline-none"
                             />
                             <button
                               type="button"
-                              onClick={() => setFieldValue("cabinAmount", Math.min(maxCabin, values.cabinAmount + 1))}
+                              onClick={() => setFieldValue("clusterAmount", Math.min(MAX_CLUSTER_AMOUNT, values.clusterAmount + 1))}
                               className="px-3 py-2.5 border-l border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
                             >
                               <Plus size={13} />
                             </button>
                           </div>
-                        )}
-
-                        {/* Show max cabin hint when standalone mode is active */}
-                        {values.compartments.length > 0 && !isSingleCabinMode && (
-                          <p className="mt-1 text-[11px] text-gray-400">Up to {maxCabin} cabins</p>
-                        )}
-                        <ErrorMessage name="cabinAmount" component="p" className="mt-1 text-xs text-red-500" />
-                      </div>
-
-                    </div>
-
-                    {/* Row 2: Vehicle Type (static) | Platform Type */}
-                    <div className="grid grid-cols-2 gap-4">
-                      {/* Vehicle Type — auto-selected, read-only display */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                          Vehicle Type
-                        </label>
-                        <div className="px-3 py-2.5 text-sm border border-gray-200 rounded-lg bg-gray-50 text-gray-700 font-medium">
-                          {FIXED_VEHICLE_TYPE}
+                          <p className="mt-1 text-[11px] text-gray-400">Up to {MAX_CLUSTER_AMOUNT} clusters</p>
+                          <ErrorMessage name="clusterAmount" component="p" className="mt-1 text-xs text-red-500" />
                         </div>
+
                       </div>
 
-                      {/* Platform Type */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1.5">
-                          Platform Type <span className="text-brand-primary">*</span>
-                        </label>
-                        <VariantQtySelector
-                          value={values.platformVariants}
-                          onChange={(next) => setFieldValue("platformVariants", next)}
-                          placeholder="Select platform type"
-                          error={
-                            touched.platformVariants && typeof errors.platformVariants === "string"
-                              ? errors.platformVariants : undefined
-                          }
-                        />
-                        {touched.platformVariants && typeof errors.platformVariants === "string" && (
-                          <p className="mt-1 text-xs text-red-500">{errors.platformVariants}</p>
-                        )}
+                      {/* Row 2: Vehicle Type | Platform Type */}
+                      <div className="grid grid-cols-2 gap-4">
+
+                        {/* Vehicle Type */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Vehicle Type <span className="text-brand-primary">*</span>
+                          </label>
+                          <VehicleTypeDropdown
+                            value={values.vehicleTypes}
+                            onChange={(next) => {
+                              const newVariants = buildPlatformVariants(next, values.platformVariants);
+                              setFieldValue("vehicleTypes", next);
+                              setFieldValue("platformVariants", newVariants);
+                            }}
+                            error={
+                              touched.vehicleTypes && typeof errors.vehicleTypes === "string"
+                                ? errors.vehicleTypes : undefined
+                            }
+                          />
+                          {touched.vehicleTypes && typeof errors.vehicleTypes === "string" && (
+                            <p className="mt-1 text-xs text-red-500">{errors.vehicleTypes}</p>
+                          )}
+                        </div>
+
+                        {/* Platform Type */}
+                        <div>
+                          <label className="block text-sm font-medium text-gray-700 mb-1.5">
+                            Platform Type <span className="text-brand-primary">*</span>
+                          </label>
+                          <PlatformVariantSelector
+                            value={values.platformVariants}
+                            onChange={(next) => setFieldValue("platformVariants", next)}
+                            disabled={noPlatformsAvailable}
+                            error={
+                              touched.platformVariants && typeof errors.platformVariants === "string"
+                                ? errors.platformVariants : undefined
+                            }
+                          />
+                          {touched.platformVariants && typeof errors.platformVariants === "string" && (
+                            <p className="mt-1 text-xs text-red-500">{errors.platformVariants}</p>
+                          )}
+                        </div>
+
                       </div>
+
                     </div>
-
-                  </div>{/* /Box 1 */}
+                  </div>{/* /CTT Config Card */}
 
                   {/* ── Box 2: Unit info ───────────────────────────── */}
                   <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">

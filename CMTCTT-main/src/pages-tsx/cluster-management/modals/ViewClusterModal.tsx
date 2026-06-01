@@ -1,51 +1,51 @@
-import { DoorOpen, Calendar, Clock } from "lucide-react";
+import { Cpu, Calendar, Clock } from "lucide-react";
 import { Button } from "@/components/button";
 import { Modal } from "@/components/modal-1";
 import { StatusBadge } from "../components/StatusBadge";
-import type { Cabin } from "../types";
+import type { Cluster } from "../types";
 
 interface Props {
-  cabin:   Cabin;
+  cluster: Cluster;
   onClose: () => void;
-  onEdit?: (cabin: Cabin) => void;
+  onEdit?: (cluster: Cluster) => void;
 }
 
-export function ViewCabinModal({ cabin, onClose, onEdit }: Props) {
-  const [date, time] = cabin.updatedOn.split("\n");
+export function ViewClusterModal({ cluster, onClose, onEdit }: Props) {
+  const [date, time] = cluster.updatedOn.split("\n");
 
   return (
     <Modal open={true} onClose={onClose} width={480} isUseX={true}>
       {/* Header */}
       <div className="flex items-start gap-4 mb-6">
         <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-          <DoorOpen size={20} className="text-brand-primary" />
+          <Cpu size={20} className="text-brand-primary" />
         </div>
         <div>
-          <h2 className="text-base font-semibold text-gray-900">Cabin Detail</h2>
-          <p className="text-sm text-gray-500 mt-0.5">{cabin.name}</p>
+          <h2 className="text-base font-semibold text-gray-900">Cluster Detail</h2>
+          <p className="text-sm text-gray-500 mt-0.5">{cluster.name}</p>
         </div>
       </div>
 
       {/* Detail rows */}
       <div className="space-y-4 mb-6">
         <div className="flex items-center justify-between py-3 border-b border-gray-100">
-          <span className="text-sm text-gray-500 font-medium">Cabin Name</span>
-          <span className="text-sm font-semibold text-gray-800">{cabin.name}</span>
+          <span className="text-sm text-gray-500 font-medium">Cluster Name</span>
+          <span className="text-sm font-semibold text-gray-800">{cluster.name}</span>
         </div>
 
         <div className="flex items-center justify-between py-3 border-b border-gray-100">
           <span className="text-sm text-gray-500 font-medium">Status</span>
-          <StatusBadge status={cabin.status} />
+          <StatusBadge status={cluster.status} />
         </div>
 
         <div className="flex items-start justify-between py-3 border-b border-gray-100">
           <span className="text-sm text-gray-500 font-medium">Blackout Dates</span>
           <div className="text-right max-w-[260px]">
-            {cabin.blackoutDates.length === 0 ? (
+            {cluster.blackoutDates.length === 0 ? (
               <span className="text-sm text-gray-400">No blackout dates</span>
             ) : (
               <div className="flex flex-wrap gap-1.5 justify-end">
-                {cabin.blackoutDates.map((d, i) => (
+                {cluster.blackoutDates.map((d, i) => (
                   <span
                     key={i}
                     className="inline-flex items-center gap-1 px-2 py-0.5 bg-orange-50 border border-orange-200 text-orange-600 text-xs rounded-full"
@@ -85,10 +85,10 @@ export function ViewCabinModal({ cabin, onClose, onEdit }: Props) {
         </Button>
         {onEdit && (
           <Button
-            onClick={() => { onClose(); onEdit(cabin); }}
+            onClick={() => { onClose(); onEdit(cluster); }}
             className="flex-1 py-2.5 text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover justify-center"
           >
-            Edit Cabin
+            Edit Cluster
           </Button>
         )}
       </div>
