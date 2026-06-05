@@ -8,10 +8,14 @@ export const PROGRAMS = [
 ];
 
 /** Which program cards to show per session type */
+// NOTE: "CMT+CTT" is temporarily hidden from the Integrated tab (do NOT delete —
+// the full CMT+CTT booking flow, onboarding, and live-training dashboard remain
+// fully functional in the codebase and can be re-enabled by adding "CMT+CTT"
+// back to the Integrated array below).
 export const PROGRAMS_BY_SESSION: Record<string, readonly string[]> = {
   "Standalone":    ["SWT", "CMT", "CTT"],
   "SimIntegrated": ["CMT", "CTT"],
-  "Integrated":    ["SWT", "CMT", "CTT", "CMT+CTT"],
+  "Integrated":    ["SWT", "CMT", "CTT"],   // "CMT+CTT" hidden — re-add to show
 };
 
 export const STEPS        = ["Booking Details", "Lane Configuration", "Nominal Roll", "Schedule"];

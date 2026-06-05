@@ -1,6 +1,7 @@
 import { useState, useMemo } from "react";
 import { bookings } from "@/data/mock";
 import type { BookingStatus } from "@/data/mock";
+import { getCMTLocalBookings, cmtLocalBookingToBooking } from "@/data/localBookings";
 import { Button } from "@/components/button";
 import { PER_PAGE } from "./constants";
 import type { BookingListProps, TabType } from "./types";
@@ -14,18 +15,24 @@ export function BookingList({ onNavigate, createPath = "/bookings/create" }: Boo
   const [searchQuery, setSearchQuery] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
+  // Merge mock bookings with any locally-saved CMT bookings
+  const allBookings = useMemo(() => {
+    const local = getCMTLocalBookings().map(cmtLocalBookingToBooking);
+    return [...bookings, ...local];
+  }, []);
+
   // Tab counts
   const tabCounts = useMemo(() => {
-    const counts: Record<string, number> = { Overall: bookings.length };
-    for (const b of bookings) {
+    const counts: Record<string, number> = { Overall: allBookings.length };
+    for (const b of allBookings) {
       counts[b.status] = (counts[b.status] ?? 0) + 1;
     }
     return counts;
-  }, []);
+  }, [allBookings]);
 
   // Filtered + sorted list
   const filtered = useMemo(() => {
-    let result = bookings.filter((b) => {
+    let result = allBookings.filter((b) => {
       const matchesTab = activeTab === "Overall" || b.status === (activeTab as BookingStatus);
       const matchesSearch =
         !searchQuery ||
@@ -34,13 +41,13 @@ export function BookingList({ onNavigate, createPath = "/bookings/create" }: Boo
         b.unitName.toLowerCase().includes(searchQuery.toLowerCase());
       return matchesTab && matchesSearch;
     });
-    result = [...result].sort((a, b) => {
+    result = [...result].sort((a, bItem) => {
       const da = a.bookingDate;
-      const db = b.bookingDate;
+      const db = bItem.bookingDate;
       return sortDir === "asc" ? da.localeCompare(db) : db.localeCompare(da);
     });
     return result;
-  }, [activeTab, searchQuery, sortDir]);
+  }, [activeTab, searchQuery, sortDir, allBookings]);
 
   const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 

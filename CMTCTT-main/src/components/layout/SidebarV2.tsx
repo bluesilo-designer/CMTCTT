@@ -31,8 +31,9 @@ const navGroups: { label: string; items: NavItem[] }[] = [
         icon: <CalendarDays size={16} />,
         path: "/bookings/list",
         children: [
-          { label: "Today's Booking", icon: <></>, path: "/bookings/today" },
-          { label: "Booking List", icon: <></>, path: "/bookings/list" },
+          { label: "Booking List CMT CTT", icon: <></>, path: "/bookings/list/cmtctt" },
+          { label: "Booking List IMT",     icon: <></>, path: "/bookings/list/imt"    },
+          { label: "Booking List SWT",     icon: <></>, path: "/bookings/list/swt"    },
         ],
       },
       { label: "Training Results",          icon: <GraduationCap size={16} />, path: "/training-results"          },

@@ -14,12 +14,11 @@ const COMPARTMENT_OPTIONS = [
   "CMT_Gunnery",
   "CMT_Vehicle",
   "CMT_Standalone",
-  "CTT_Standalone",
-  "SimIntegrated",
+  // NOTE: "CTT_Standalone" and "SimIntegrated" are temporarily hidden — do NOT delete
 ];
 
 /** Selecting one of these deselects everything else; nothing else can be added while one is active */
-const STANDALONE_OPTIONS = new Set(["CMT_Standalone", "CTT_Standalone"]);
+const STANDALONE_OPTIONS = new Set(["CMT_Standalone"]);
 
 /**
  * Training types that cap cabin amount to 1.
@@ -158,14 +157,20 @@ function CompartmentSelector({
 
 // ── Simple single-select dropdown ─────────────────────────────────────────────
 
-/** Multi-select + qty dropdown — Platform Type selector */
+/**
+ * Platform Type selector.
+ * - cabinAmount === 1 : radio mode — select exactly one, no qty shown.
+ * - cabinAmount  >  1 : checkbox mode — select one or both, qty stepper,
+ *                       sum of selected qtys capped at cabinAmount.
+ */
 function VariantQtySelector({
-  value, onChange, placeholder, error,
+  value, onChange, placeholder, error, cabinAmount = 1,
 }: {
-  value:       VariantItem[];
-  onChange:    (next: VariantItem[]) => void;
+  value:        VariantItem[];
+  onChange:     (next: VariantItem[]) => void;
   placeholder?: string;
-  error?:      string;
+  error?:       string;
+  cabinAmount?: number;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -178,14 +183,44 @@ function VariantQtySelector({
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const toggle = (id: string) =>
-    onChange(value.map(v => v.id === id ? { ...v, selected: !v.selected } : v));
-  const setQty = (id: string, delta: number) =>
-    onChange(value.map(v => v.id === id ? { ...v, qty: Math.max(1, v.qty + delta) } : v));
+  const isSingle = cabinAmount === 1;
+
+  /** Total qty currently allocated across all selected items */
+  const totalQty = value.filter(i => i.selected).reduce((s, i) => s + i.qty, 0);
+
+  const toggle = (id: string) => {
+    if (isSingle) {
+      // Radio: selecting one deselects all others
+      onChange(value.map(v => ({ ...v, selected: v.id === id })));
+    } else {
+      const item = value.find(v => v.id === id)!;
+      if (item.selected) {
+        // Deselect
+        onChange(value.map(v => v.id === id ? { ...v, selected: false } : v));
+      } else {
+        // Select with qty=1, but only if there's remaining quota
+        const remaining = cabinAmount - totalQty;
+        if (remaining <= 0) return;
+        onChange(value.map(v => v.id === id ? { ...v, selected: true, qty: 1 } : v));
+      }
+    }
+  };
+
+  const setQty = (id: string, delta: number) => {
+    onChange(value.map(v => {
+      if (v.id !== id) return v;
+      const newQty = Math.max(1, v.qty + delta);
+      // Cap so total doesn't exceed cabinAmount
+      const otherTotal = value.filter(x => x.selected && x.id !== id).reduce((s, x) => s + x.qty, 0);
+      return { ...v, qty: Math.min(newQty, cabinAmount - otherTotal) };
+    }));
+  };
 
   const selected = value.filter(i => i.selected);
   const summary  = selected.length > 0
-    ? selected.map(i => `${i.label} (${i.qty})`).join(", ")
+    ? isSingle
+      ? selected.map(i => i.label).join(", ")
+      : selected.map(i => `${i.label} (${i.qty})`).join(", ")
     : "";
 
   return (
@@ -205,30 +240,60 @@ function VariantQtySelector({
       </button>
       {open && (
         <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 max-h-60 overflow-y-auto">
+          {!isSingle && (
+            <p className="px-3 pt-1 pb-0.5 text-[10px] text-gray-400">
+              Total qty: {totalQty} / {cabinAmount}
+            </p>
+          )}
           {value.map(item => (
             <div key={item.id} className="flex items-center gap-2 px-3 py-2 hover:bg-gray-50">
-              <button
-                type="button"
-                onClick={() => toggle(item.id)}
-                className={cn(
-                  "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
-                  item.selected ? "bg-brand-primary border-brand-primary" : "border-gray-300"
-                )}
-              >
-                {item.selected && <Check size={10} className="text-white" strokeWidth={3} />}
-              </button>
+              {isSingle ? (
+                /* Radio circle */
+                <button
+                  type="button"
+                  onClick={() => toggle(item.id)}
+                  className={cn(
+                    "w-4 h-4 rounded-full border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                    item.selected ? "border-brand-primary" : "border-gray-300"
+                  )}
+                >
+                  {item.selected && <span className="w-2 h-2 rounded-full bg-brand-primary" />}
+                </button>
+              ) : (
+                /* Checkbox */
+                <button
+                  type="button"
+                  onClick={() => toggle(item.id)}
+                  className={cn(
+                    "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                    item.selected ? "bg-brand-primary border-brand-primary" : "border-gray-300"
+                  )}
+                >
+                  {item.selected && <Check size={10} className="text-white" strokeWidth={3} />}
+                </button>
+              )}
               <span className={cn("flex-1 text-sm", item.selected ? "text-gray-800 font-medium" : "text-gray-700")}>
                 {item.label}
               </span>
-              {item.selected && (
+              {/* Qty stepper — only shown in multi-cabin mode */}
+              {!isSingle && item.selected && (
                 <div className="flex items-center gap-1">
                   <button type="button" onClick={() => setQty(item.id, -1)}
                     className="w-5 h-5 rounded flex items-center justify-center text-brand-primary hover:bg-red-50 border border-brand-primary/30">
                     <Minus size={10} />
                   </button>
                   <span className="w-6 text-center text-sm font-medium text-gray-700">{item.qty}</span>
-                  <button type="button" onClick={() => setQty(item.id, +1)}
-                    className="w-5 h-5 rounded flex items-center justify-center text-brand-primary hover:bg-red-50 border border-brand-primary/30">
+                  <button
+                    type="button"
+                    onClick={() => setQty(item.id, +1)}
+                    disabled={totalQty >= cabinAmount}
+                    className={cn(
+                      "w-5 h-5 rounded flex items-center justify-center border border-brand-primary/30",
+                      totalQty >= cabinAmount
+                        ? "text-gray-300 cursor-not-allowed"
+                        : "text-brand-primary hover:bg-red-50"
+                    )}
+                  >
                     <Plus size={10} />
                   </button>
                 </div>
@@ -460,7 +525,12 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                           <div className="flex items-center border border-gray-200 rounded-lg overflow-hidden">
                             <button
                               type="button"
-                              onClick={() => setFieldValue("cabinAmount", Math.max(1, values.cabinAmount - 1))}
+                              onClick={() => {
+                                const next = Math.max(1, values.cabinAmount - 1);
+                                setFieldValue("cabinAmount", next);
+                                // Reset variant qtys to respect new cabin amount
+                                setFieldValue("platformVariants", DEFAULT_PLATFORM_VARIANTS);
+                              }}
                               className="px-3 py-2.5 border-r border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
                             >
                               <Minus size={13} />
@@ -473,7 +543,12 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                             />
                             <button
                               type="button"
-                              onClick={() => setFieldValue("cabinAmount", Math.min(maxCabin, values.cabinAmount + 1))}
+                              onClick={() => {
+                                const next = Math.min(maxCabin, values.cabinAmount + 1);
+                                setFieldValue("cabinAmount", next);
+                                // Reset variant qtys when switching away from single-cabin
+                                setFieldValue("platformVariants", DEFAULT_PLATFORM_VARIANTS);
+                              }}
                               className="px-3 py-2.5 border-l border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors"
                             >
                               <Plus size={13} />
@@ -511,6 +586,7 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                           value={values.platformVariants}
                           onChange={(next) => setFieldValue("platformVariants", next)}
                           placeholder="Select platform type"
+                          cabinAmount={values.cabinAmount}
                           error={
                             touched.platformVariants && typeof errors.platformVariants === "string"
                               ? errors.platformVariants : undefined

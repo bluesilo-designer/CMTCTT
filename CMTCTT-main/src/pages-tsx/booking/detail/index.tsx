@@ -2,7 +2,11 @@ import { useState, useRef, useEffect, useMemo } from "react";
 import type { Booking } from "./types";
 import { useBookingStore } from "./store/useBookingStore";
 import { NominalRollTable } from "./components/NominalRollTable";
+import { CMTNominalRollDetail } from "./components/CMTNominalRollDetail";
+import { CMTDetailListTab } from "./components/CMTDetailListTab";
 import { LaneConfigTable } from "./components/LaneConfigTable";
+import { BookingDetailListTab } from "./components/BookingDetailListTab";
+import { CMTCabinConfigStep } from "../create/components/CMTCabinConfigStep";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { CMTOnboardingFlow } from "./components/CMTOnboardingFlow";
 import { CMTCTTOnboardingFlow } from "./components/CMTCTTOnboardingFlow";
@@ -16,6 +20,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { bookings } from "@/data/mock";
+import { getCMTLocalBookingById, cmtLocalBookingToBooking } from "@/data/localBookings";
 
 // ── Mock booking base data ────────────────────────────────────────────────────
 const BOOKING_DATA = {
@@ -78,7 +83,7 @@ function Field({ label, value }: { label: string; value: React.ReactNode }) {
 // BOOKING DETAIL PAGE
 // ══════════════════════════════════════════════════════════════════════════════
 
-type DetailTab = "Booking Details" | "Nominal Rolls" | "Lane Configuration";
+type DetailTab = "Booking Details" | "Nominal Rolls" | "Lane Configuration" | "Cabin Configuration" | "Detail List";
 
 export function BookingDetail() {
   const [activeTab, setActiveTab] = useState<DetailTab>("Booking Details");
@@ -100,8 +105,6 @@ export function BookingDetail() {
     return () => document.removeEventListener("mousedown", h);
   }, []);
 
-  const tabs: DetailTab[] = ["Booking Details", "Nominal Rolls", "Lane Configuration"];
-
   const getBookingData = () => {
     const params = new URLSearchParams(window.location.search);
     let bookingId = params.get("id");
@@ -109,7 +112,14 @@ export function BookingDetail() {
       const hashMatch = window.location.hash.match(/\?id=([^&]+)/);
       if (hashMatch) bookingId = hashMatch[1];
     }
-    return bookings.find(b => b.id === (bookingId || "1"));
+    const id = bookingId || "1";
+    // Check mock data first
+    const mockBooking = bookings.find(b => b.id === id);
+    if (mockBooking) return mockBooking;
+    // Fall back to locally-saved CMT bookings
+    const localEntry = getCMTLocalBookingById(id);
+    if (localEntry) return cmtLocalBookingToBooking(localEntry);
+    return undefined;
   };
 
   const selectedBooking = getBookingData();
@@ -152,6 +162,10 @@ export function BookingDetail() {
     isIntegrated: false,
     isCMT: false,
   }, [selectedBooking]);
+
+  const tabs: DetailTab[] = BOOKING.isCMT
+    ? ["Booking Details", "Nominal Rolls", "Cabin Configuration", "Detail List"]
+    : ["Booking Details", "Nominal Rolls", "Lane Configuration", "Detail List"];
 
   useEffect(() => {
     setBooking(BOOKING);
@@ -233,17 +247,11 @@ export function BookingDetail() {
                 </div>
               )}
 
-              {["Ongoing", "Upcoming"].includes(BOOKING.status) && (
+              {/* Onboarding is only for CMT+CTT — hidden for standalone CMT */}
+              {["Ongoing", "Upcoming"].includes(BOOKING.status) && isCMTCTT && (
                 <Button
-                  onClick={() => {
-                    if (isCMTCTT) { setShowOnboarding(true); return; }
-                    selectedBooking?.assetIssued && setShowCoursewarePopup(true);
-                  }}
-                  disabled={!isCMTCTT && !selectedBooking?.assetIssued}
-                  className={cn("px-5 py-2.5 text-sm font-semibold w-auto",
-                    (isCMTCTT || selectedBooking?.assetIssued)
-                      ? "bg-brand-primary text-white hover:bg-brand-primary-hover"
-                      : "bg-gray-100 text-gray-400 cursor-not-allowed")}
+                  onClick={() => setShowOnboarding(true)}
+                  className="px-5 py-2.5 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
                 >
                   {BOOKING.status === "Ongoing" ? "Continue Session" : "Start Onboarding"}
                 </Button>
@@ -506,33 +514,39 @@ export function BookingDetail() {
 
           {/* Tab: Nominal Rolls */}
           {!isCMTCTT && activeTab === "Nominal Rolls" && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
-                <div className="relative">
-                  <select className="appearance-none text-sm text-gray-700 border border-gray-200 rounded-lg pl-3 pr-8 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary cursor-pointer min-w-[220px]">
-                    <option>{BOOKING.courseware || "Night Test for SAR21/M16 BTP"}</option>
-                  </select>
-                  <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-                </div>
-                {BOOKING.status === "Upcoming" && (
-                  <div className="flex items-center gap-2">
-                    <Button
-                      type="outline"
-                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 w-auto border border-gray-200"
-                    >
-                      <Upload size={14} /> Upload List
-                    </Button>
-                    <Button
-                      onClick={() => setShowAddTrainee(true)}
-                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
-                    >
-                      <Plus size={14} /> Add Trainee
-                    </Button>
+            BOOKING.isCMT ? (
+              /* CMT — use the same table as the create-booking flow */
+              <CMTNominalRollDetail />
+            ) : (
+              /* Non-CMT — original nominal roll table */
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100 gap-3 flex-wrap">
+                  <div className="relative">
+                    <select className="appearance-none text-sm text-gray-700 border border-gray-200 rounded-lg pl-3 pr-8 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary cursor-pointer min-w-[220px]">
+                      <option>{BOOKING.courseware || "Night Test for SAR21/M16 BTP"}</option>
+                    </select>
+                    <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
                   </div>
-                )}
+                  {BOOKING.status === "Upcoming" && (
+                    <div className="flex items-center gap-2">
+                      <Button
+                        type="outline"
+                        className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-gray-600 w-auto border border-gray-200"
+                      >
+                        <Upload size={14} /> Upload List
+                      </Button>
+                      <Button
+                        onClick={() => setShowAddTrainee(true)}
+                        className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
+                      >
+                        <Plus size={14} /> Add Trainee
+                      </Button>
+                    </div>
+                  )}
+                </div>
+                <NominalRollTable trainees={BOOKING.trainees} status={BOOKING.status} />
               </div>
-              <NominalRollTable trainees={BOOKING.trainees} status={BOOKING.status} />
-            </div>
+            )
           )}
 
           {showAddTrainee && (
@@ -553,6 +567,35 @@ export function BookingDetail() {
               </div>
               <LaneConfigTable laneConfig={BOOKING.laneConfig} />
             </div>
+          )}
+
+          {!isCMTCTT && activeTab === "Cabin Configuration" && (() => {
+            // Load cabin + IOS data from localStorage for locally-created CMT bookings
+            const localData = selectedBooking?.id?.startsWith("cmt-local-")
+              ? getCMTLocalBookingById(selectedBooking.id)
+              : undefined;
+            return (
+              <CMTCabinConfigStep
+                bookingDetails={null}
+                gridCols="grid-cols-[70%_30%]"
+                initialCabins={localData?.cabins}
+                initialIosList={localData?.iosList}
+              />
+            );
+          })()}
+
+          {!isCMTCTT && activeTab === "Detail List" && (
+            BOOKING.isCMT
+              ? <CMTDetailListTab status={BOOKING.status} />
+              : (
+                <BookingDetailListTab
+                  bookingTitle={BOOKING.title}
+                  bookingId={BOOKING.id}
+                  unitName={BOOKING.program}
+                  courseware={BOOKING.courseware ?? "—"}
+                  status={BOOKING.status}
+                />
+              )
           )}
         </div>
       </div>

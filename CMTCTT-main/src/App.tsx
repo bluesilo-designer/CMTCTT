@@ -97,7 +97,8 @@ function MainLayout({ children }: { children: React.ReactNode }) {
       return "/operational-availability";
     if (currentPath.startsWith("/reports/stock-take"))
       return "/reports/stock-take";
-    if (currentPath === "/bookings/detail") return "/bookings/list";
+    if (currentPath === "/bookings/detail") return "/bookings/list/cmtctt";
+    if (currentPath === "/bookings/create") return "/bookings/list/cmtctt";
     return currentPath;
   };
 
@@ -208,6 +209,18 @@ function OperationalAvailabilityDetailWrapper() {
   );
 }
 
+// ── Empty placeholder for IMT / SWT booking lists ─────────────────────────────
+function BookingListPlaceholder({ title }: { title: string }) {
+  return (
+    <div className="flex-1 overflow-auto bg-gray-50 p-6">
+      <h1 className="text-xl font-semibold text-brand-primary mb-6">{title}</h1>
+      <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
+        <p className="text-sm text-gray-400">No bookings yet — coming soon.</p>
+      </div>
+    </div>
+  );
+}
+
 // ── Auth Route Protection ──
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
   const isLoggedIn = localStorage.getItem("isLoggedIn") === "true";
@@ -228,7 +241,7 @@ export default function App() {
             <Login
               onLogin={() => {
                 localStorage.setItem("isLoggedIn", "true");
-                window.location.href = "/bookings/list";
+                window.location.href = "/bookings/list/cmtctt";
               }}
             />
           }
@@ -240,7 +253,7 @@ export default function App() {
           element={
             <ProtectedRoute>
               <CreateBooking
-                onClose={() => (window.location.href = "/bookings/list")}
+                onClose={() => (window.location.href = "/bookings/list/cmtctt")}
               />
             </ProtectedRoute>
           }
@@ -300,7 +313,11 @@ export default function App() {
         />
         <Route
           path="/bookings"
-          element={<Navigate to="/bookings/list" replace />}
+          element={<Navigate to="/bookings/list/cmtctt" replace />}
+        />
+        <Route
+          path="/bookings/list"
+          element={<Navigate to="/bookings/list/cmtctt" replace />}
         />
         <Route
           path="/bookings/today"
@@ -310,11 +327,28 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+        {/* ── Booking List sub-routes ─────────────────────────────── */}
         <Route
-          path="/bookings/list"
+          path="/bookings/list/cmtctt"
           element={
             <ProtectedRoute>
               <WithNavigate Component={BookingList} />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bookings/list/imt"
+          element={
+            <ProtectedRoute>
+              <BookingListPlaceholder title="Booking List IMT" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/bookings/list/swt"
+          element={
+            <ProtectedRoute>
+              <BookingListPlaceholder title="Booking List SWT" />
             </ProtectedRoute>
           }
         />

@@ -7,7 +7,8 @@ import { LaneConfigStep } from "./components/LaneConfigStep";
 import { NominalRollStep } from "./components/NominalRollStep";
 import { ScheduleStep } from "./components/ScheduleStep";
 import { CMTBookingDetailsStep } from "./components/CMTBookingDetailsStep";
-import { CMTCabinConfigStep, CMTCTT_INITIAL_CABINS } from "./components/CMTCabinConfigStep";
+import { CMTCabinConfigStep, CMTCTT_INITIAL_CABINS, INITIAL_CABINS, type IosEntry, type CabinRow } from "./components/CMTCabinConfigStep";
+import { saveCMTLocalBooking } from "@/data/localBookings";
 import { CMTNominalRollStep } from "./components/CMTNominalRollStep";
 import { CMTCTTBookingDetailsStep } from "./components/CMTCTTBookingDetailsStep";
 import { CMTCTTClusterConfigStep } from "./components/CMTCTTClusterConfigStep";
@@ -187,9 +188,11 @@ function ProgramSelection({ sessionType, setSessionType, onSelect }: {
 }
 
 // ── CMT Booking Form (3-step: Booking Details → Cabin Configuration → Nominal Roll) ──
-function CMTBookingForm({ sessionType: _sessionType, onBack }: { sessionType: SessionType; onBack: () => void }) {
+function CMTBookingForm({ sessionType: _sessionType, onBack, onComplete }: { sessionType: SessionType; onBack: () => void; onComplete?: () => void }) {
   const [step,           setStep]           = useState(0);
   const [bookingDetails, setBookingDetails] = useState<CMTBookingDetailsValues | null>(null);
+  const [iosList,        setIosList]        = useState<IosEntry[]>([]);
+  const [cabins,         setCabins]         = useState<CabinRow[]>(INITIAL_CABINS);
 
   const handleNext = () => {
     if (step === 0) {
@@ -205,6 +208,14 @@ function CMTBookingForm({ sessionType: _sessionType, onBack }: { sessionType: Se
     // step 2 (Nominal Roll) — open the CMT review modal via hidden trigger
     const btn = document.getElementById("cmt-nominal-next-trigger");
     if (btn) btn.click();
+  };
+
+  /** Save to localStorage then close the form */
+  const handleCMTComplete = () => {
+    if (bookingDetails) {
+      saveCMTLocalBooking(bookingDetails, cabins, iosList);
+    }
+    (onComplete ?? onBack)();
   };
 
   return (
@@ -235,8 +246,20 @@ function CMTBookingForm({ sessionType: _sessionType, onBack }: { sessionType: Se
           onNext={(vals) => { setBookingDetails(vals); setStep(1); }}
         />
       )}
-      {step === 1 && <CMTCabinConfigStep bookingDetails={bookingDetails} />}
-      {step === 2 && <CMTNominalRollStep onNext={onBack} />}
+      {step === 1 && (
+        <CMTCabinConfigStep
+          bookingDetails={bookingDetails}
+          onIOSChange={setIosList}
+          onCabinsChange={setCabins}
+        />
+      )}
+      {step === 2 && (
+        <CMTNominalRollStep
+          bookingDetails={bookingDetails}
+          iosList={iosList}
+          onNext={handleCMTComplete}
+        />
+      )}
     </div>
   );
 }
@@ -486,6 +509,7 @@ export function CreateBooking({ onClose }: { onClose: () => void }) {
         <CMTBookingForm
           sessionType={sessionType}
           onBack={() => setSelectedProgram(null)}
+          onComplete={onClose}
         />
       ) : selectedProgram === "CTT" ? (
         <CTTBookingForm

@@ -1,10 +1,9 @@
 import { useMemo } from "react";
-import { Eye, Clock, CheckCircle2, ArrowUpDown } from "lucide-react";
+import { Eye, ArrowUpDown } from "lucide-react";
 import { createColumnHelper } from "@tanstack/react-table";
 import { TableCustom } from "@/components/table";
 import { StatusBadge } from "@/components/ui/StatusBadge";
 import type { Booking } from "@/data/mock";
-import { cn } from "@/lib/utils";
 import { PER_PAGE } from "../constants";
 import type { TabType } from "../types";
 import { parseBookingTime } from "../utils";
@@ -32,7 +31,7 @@ export function BookingTable({
 }: BookingTableProps) {
   const columns = useMemo(() => {
     const cols = [
-      columnHelper.display({
+      Object.assign(columnHelper.display({
         id: "rowNum",
         header: () => "#",
         cell: (info) => (
@@ -43,7 +42,7 @@ export function BookingTable({
             {(currentPage - 1) * PER_PAGE + info.row.index + 1}
           </div>
         ),
-      }),
+      }), { width: "48px", minWidth: "48px", maxWidth: "48px" }),
       columnHelper.display({
         id: "booking",
         header: () => "Booking",
@@ -69,17 +68,10 @@ export function BookingTable({
           const booking = info.row.original;
           return (
             <div
-              className="cursor-pointer"
+              className="cursor-pointer text-sm text-gray-700"
               onClick={() => onNavigate?.(`/bookings/detail?id=${booking.id}`)}
             >
-              <span className={cn(
-                "inline-flex items-center px-2 py-0.5 rounded-md text-xs font-semibold",
-                booking.trainingType === "Group"
-                  ? "bg-blue-50 text-blue-600"
-                  : "bg-purple-50 text-purple-600"
-              )}>
-                {booking.trainingType}
-              </span>
+              {booking.trainingType}
             </div>
           );
         },
@@ -187,33 +179,7 @@ export function BookingTable({
       }),
     ];
 
-    // Conditionally insert the Assets column before Mode (index 5) when not on Completed tab
-    if (activeTab !== "Completed") {
-      const assetsCol = columnHelper.display({
-        id: "assets",
-        header: () => "Assets",
-        cell: (info) => {
-          const booking = info.row.original;
-          return (
-            <div
-              className="cursor-pointer"
-              onClick={() => onNavigate?.(`/bookings/detail?id=${booking.id}`)}
-            >
-              {booking.assetIssued ? (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-green-50 text-green-600 border border-green-100">
-                  <CheckCircle2 size={10} /> Issued
-                </span>
-              ) : (
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-amber-50 text-amber-600 border border-amber-100">
-                  <Clock size={10} /> Pending
-                </span>
-              )}
-            </div>
-          );
-        },
-      });
-      cols.splice(5, 0, assetsCol);
-    }
+    // NOTE: Assets column hidden — do NOT delete (re-add assetsCol + cols.splice to restore)
 
     return cols;
   }, [activeTab, currentPage, onNavigate, onToggleSort]);

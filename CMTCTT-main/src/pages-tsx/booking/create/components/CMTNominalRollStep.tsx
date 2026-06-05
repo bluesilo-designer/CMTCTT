@@ -8,6 +8,8 @@ import { TableCustom } from "@/components/table";
 import { Pagination } from "@/components/ui/Pagination";
 import { CMTUploadListModal } from "../modals/CMTUploadListModal";
 import { CMTReviewModal } from "../modals/CMTReviewModal";
+import type { CMTBookingDetailsValues } from "./CMTBookingDetailsStep";
+import type { IosEntry } from "./CMTCabinConfigStep";
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
 
@@ -45,7 +47,15 @@ type Trainee = typeof CMT_TRAINEES[number];
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export function CMTNominalRollStep({ onNext }: { onNext: () => void }) {
+export function CMTNominalRollStep({
+  onNext,
+  bookingDetails,
+  iosList,
+}: {
+  onNext: () => void;
+  bookingDetails?: CMTBookingDetailsValues | null;
+  iosList?: IosEntry[];
+}) {
   const [trainees]         = useState(CMT_TRAINEES);
   const [searchQuery,  setSearchQuery]  = useState("");
   const [currentPage,  setCurrentPage]  = useState(1);
@@ -64,11 +74,14 @@ export function CMTNominalRollStep({ onNext }: { onNext: () => void }) {
   const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
   // ── Columns ───────────────────────────────────────────────────────────────
-  const columns = useMemo<ColumnDef<Trainee, any>[]>(() => [
+  type Col = ColumnDef<Trainee, any> & { width?: string; minWidth?: string; maxWidth?: string };
+
+  const columns = useMemo<Col[]>(() => [
     {
-      id:     "select",
-      header: () => <Checkbox size={16} />,
-      cell:   () => <Checkbox size={16} />,
+      id:       "select",
+      header:   () => <Checkbox size={16} />,
+      cell:     () => <Checkbox size={16} />,
+      width: "44px", minWidth: "44px", maxWidth: "44px",
     },
     {
       id:     "no",
@@ -78,11 +91,13 @@ export function CMTNominalRollStep({ onNext }: { onNext: () => void }) {
           {(currentPage - 1) * PER_PAGE + row.index + 1}
         </span>
       ),
+      width: "56px", minWidth: "56px", maxWidth: "56px",
     },
     {
       accessorKey: "rank",
       header:      () => "Rank",
       cell:        ({ getValue }: any) => <span className="text-sm text-gray-700">{getValue()}</span>,
+      width: "76px", minWidth: "76px", maxWidth: "76px",
     },
     {
       accessorKey: "name",
@@ -90,66 +105,48 @@ export function CMTNominalRollStep({ onNext }: { onNext: () => void }) {
       cell:        ({ getValue }: any) => (
         <span className="text-sm font-medium text-gray-800">{getValue()}</span>
       ),
+      minWidth: "160px",
     },
     {
       accessorKey: "nric",
       header:      () => "NRIC",
-      cell:        ({ getValue }: any) => <span className="text-sm text-gray-700">{getValue()}</span>,
-    },
-    {
-      accessorKey: "battalion",
-      header:      () => "Battalion",
-      cell:        ({ getValue }: any) => <span className="text-sm text-gray-700">{getValue()}</span>,
-    },
-    {
-      accessorKey: "company",
-      header:      () => "Company",
-      cell:        ({ getValue }: any) => <span className="text-sm text-gray-700">{getValue()}</span>,
-    },
-    {
-      accessorKey: "section",
-      header:      () => "Section",
-      cell:        ({ getValue }: any) => <span className="text-sm text-gray-700">{getValue()}</span>,
-    },
-    {
-      accessorKey: "appointment",
-      header:      () => "Appointment",
-      cell:        ({ getValue }: any) => <span className="text-sm text-gray-400">{getValue()}</span>,
-    },
-    {
-      accessorKey: "platoon",
-      header:      () => "Platoon Number",
-      cell:        ({ getValue }: any) => <span className="text-sm text-gray-700">{getValue()}</span>,
+      cell:        ({ getValue }: any) => (
+        <span className="text-sm text-gray-700 font-mono">{getValue()}</span>
+      ),
+      width: "112px", minWidth: "112px", maxWidth: "112px",
     },
     {
       accessorKey: "roles",
-      header:      () => "Roles",
+      header:      () => "Role",
       cell:        ({ getValue }: any) => <span className="text-sm text-gray-700">{getValue()}</span>,
+      width: "72px", minWidth: "72px", maxWidth: "72px",
     },
     {
       id:     "lastUpdated",
-      header: () => "Last Updated On",
+      header: () => "Last Updated",
       cell:   () => (
-        <span className="text-sm text-gray-500 whitespace-nowrap">
-          17 January 2025
+        <div className="text-sm text-gray-500 whitespace-nowrap">
+          17 Jan 2025
           <br />
-          <span className="text-xs">09.29.33 AM</span>
-        </span>
+          <span className="text-xs text-gray-400">09:29 AM</span>
+        </div>
       ),
+      width: "130px", minWidth: "130px", maxWidth: "130px",
     },
     {
       id:     "actions",
       header: () => "",
       cell:   () => (
-        <div className="flex items-center gap-2">
-          <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors">
-            <Pencil size={14} />
+        <div className="flex items-center gap-1.5">
+          <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors p-1">
+            <Pencil size={13} />
           </button>
-          <button type="button" className="text-gray-400 hover:text-red-500 transition-colors">
-            <Trash2 size={14} />
+          <button type="button" className="text-gray-400 hover:text-red-500 transition-colors p-1">
+            <Trash2 size={13} />
           </button>
         </div>
       ),
+      width: "64px", minWidth: "64px", maxWidth: "64px",
     },
   ], [currentPage]);
 
@@ -157,63 +154,68 @@ export function CMTNominalRollStep({ onNext }: { onNext: () => void }) {
   return (
     <div className="flex-1 overflow-auto bg-gray-50 p-6">
 
-      {/* Header bar */}
-      <div className="flex items-center justify-between mb-5">
-        <h2 className="text-base font-semibold text-gray-800">
-          Nominal Roll{" "}
-          <span className="font-normal text-gray-500">({trainees.length} Trainees)</span>
-        </h2>
+      {/* Centered 65%-width container */}
+      <div className="w-[65%] mx-auto">
 
-        <div className="flex items-center gap-2">
-          {/* Search */}
-          <div className="relative">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
-            <InputCustom
-              value={searchQuery}
-              onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
-              placeholder="Search"
-              className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg w-52 focus:ring-1 focus:ring-brand-primary"
-            />
+        {/* Header bar */}
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-semibold text-gray-800">
+            Nominal Roll{" "}
+            <span className="font-normal text-gray-500">({trainees.length} Trainees)</span>
+          </h2>
+
+          <div className="flex items-center gap-2">
+            {/* Search */}
+            <div className="relative">
+              <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400" />
+              <InputCustom
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); setCurrentPage(1); }}
+                placeholder="Search"
+                className="pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg w-40 focus:ring-1 focus:ring-brand-primary"
+              />
+            </div>
+
+            {/* Filter */}
+            <Button
+              type="outline"
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 w-auto border border-gray-200"
+            >
+              <Filter size={14} /> Filter
+            </Button>
+
+            {/* Upload List */}
+            <Button
+              type="outline"
+              onClick={() => setShowUpload(true)}
+              className="flex items-center gap-2 px-3 py-2 text-sm font-medium text-gray-600 w-auto border border-gray-200"
+            >
+              <Upload size={14} /> Upload List
+            </Button>
+
+            {/* Add Trainee */}
+            <Button className="flex items-center gap-2 px-3 py-2 text-sm font-medium w-auto bg-brand-primary text-white hover:bg-brand-primary-hover">
+              <Plus size={14} /> Add Trainee
+            </Button>
           </div>
-
-          {/* Filter */}
-          <Button
-            type="outline"
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 w-auto border border-gray-200"
-          >
-            <Filter size={14} /> Filter
-          </Button>
-
-          {/* Upload List */}
-          <Button
-            type="outline"
-            onClick={() => setShowUpload(true)}
-            className="flex items-center gap-2 px-4 py-2 text-sm font-medium text-gray-600 w-auto border border-gray-200"
-          >
-            <Upload size={14} /> Upload List
-          </Button>
-
-          {/* Add Trainee */}
-          <Button className="flex items-center gap-2 px-4 py-2 text-sm font-medium w-auto bg-brand-primary text-white hover:bg-brand-primary-hover">
-            <Plus size={14} /> Add Trainee
-          </Button>
         </div>
-      </div>
 
-      {/* Table */}
-      <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
-        <TableCustom<Trainee>
-          columns={columns}
-          data={paginated}
-          autoScrollTable={true}
-        />
-        <Pagination
-          currentPage={currentPage}
-          itemsPerPage={PER_PAGE}
-          totalItems={filtered.length}
-          setCurrentPage={setCurrentPage}
-        />
-      </div>
+        {/* Table */}
+        <div className="bg-white border border-gray-200 rounded-xl overflow-hidden">
+          <TableCustom<Trainee>
+            columns={columns}
+            data={paginated}
+            autoScrollTable={true}
+          />
+          <Pagination
+            currentPage={currentPage}
+            itemsPerPage={PER_PAGE}
+            totalItems={filtered.length}
+            setCurrentPage={setCurrentPage}
+          />
+        </div>
+
+      </div>{/* /centered container */}
 
       {/* Hidden trigger — called by CMTBookingForm's "Next" button on step 2 */}
       <button
@@ -230,16 +232,41 @@ export function CMTNominalRollStep({ onNext }: { onNext: () => void }) {
       {showReview && (
         <CMTReviewModal
           totalTrainees={trainees.length}
-          bookingType="Entire Cabin"
-          cabin={5}
-          vehicleType="ICV (TERREX)"
-          weaponVariant="40AGL (3), 50HMG (2)"
+          bookingType={bookingDetails?.bookingType ?? "Compartment Selection"}
+          cabin={bookingDetails?.cabinAmount ?? 1}
+          vehicleType={bookingDetails?.vehicleType ?? "ICV (TERREX)"}
+          weaponVariant={(() => {
+            if (!bookingDetails?.platformVariants) return "—";
+            const isSingle = (bookingDetails.cabinAmount ?? 1) === 1;
+            const selected = bookingDetails.platformVariants.filter(v => v.selected);
+            if (selected.length === 0) return "—";
+            return selected
+              .map(v => isSingle ? v.label : `${v.label} (${v.qty})`)
+              .join(", ");
+          })()}
           role="All Roles"
-          instructor="Allen Ritchson"
-          unitContact="+65 232 232 2323"
-          trainingSchedule="PM Session (12:00 PM - 5:00 PM)"
-          briefingRoom="Briefing Room A"
-          trainingDate="16 January 2025"
+          instructor={bookingDetails?.instructor ?? "—"}
+          unitContact={bookingDetails?.unitContactDetails ?? "—"}
+          trainingSchedule={(() => {
+            if (!bookingDetails?.scheduleType) return "—";
+            if (bookingDetails.scheduleType === "AM/PM") {
+              if (bookingDetails.scheduleSection === "AM") return "AM Session (8:00 AM - 12:00 PM)";
+              if (bookingDetails.scheduleSection === "PM") return "PM Session (12:00 PM - 5:00 PM)";
+              return "AM/PM Schedule";
+            }
+            if (bookingDetails.scheduleType === "Full Day") return "Full Day Schedule";
+            if (bookingDetails.scheduleType === "Ad-hoc") return "Ad-hoc Schedule";
+            return bookingDetails.scheduleType;
+          })()}
+          briefingRoom={bookingDetails?.briefingRooms?.[0] ?? "—"}
+          trainingDate={
+            bookingDetails?.selectedDate
+              ? bookingDetails.selectedDate.toLocaleDateString("en-GB", {
+                  day: "numeric", month: "long", year: "numeric",
+                })
+              : "—"
+          }
+          iosList={iosList}
           onCancel={() => setShowReview(false)}
           onConfirm={() => { setShowReview(false); onNext(); }}
         />

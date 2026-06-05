@@ -7,7 +7,7 @@ import type { CMTBookingDetailsValues } from "./CMTBookingDetailsStep";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-interface CabinRow {
+export interface CabinRow {
   id:            string;
   occupied:      boolean;
   selected:      boolean;
@@ -16,16 +16,32 @@ interface CabinRow {
   role:          string;
 }
 
-interface SlaveIOSEntry {
-  uid:   number;
-  value: string;
+export interface IosEntry {
+  uid:         number;
+  iosDevice:   string;
+  baseStation: string;
+  masterIOS:   "Yes" | "No" | "";
+  forceType:   "Opposing" | "Friendly" | "";
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const WEAPON_VARIANT_OPTIONS = ["40AGL", "50HMG", "7.62 COAX", "Smoke Discharger"];
-const ROLE_OPTIONS           = ["All role selected", "Commander", "Gunner", "Driver", "Loader"];
-const FORCE_OPTIONS          = ["Blue", "Red"];
+const ROLE_OPTIONS           = ["VO", "VC", "TS/TC", "SC", "SO"];
+
+// CMT-only IOS devices. CTT IOS devices (CTTIOS01, CTTIOS02) are reserved for
+// the CMT+CTT flow and should not appear in standalone CMT bookings.
+const IOS_OPTIONS = [
+  "CMTIOS01", "CMTIOS02", "CMTIOS03", "CMTIOS04",
+];
+
+/** Extended list that includes CTT devices — used when CMT+CTT flow is re-enabled */
+export const CMTCTT_IOS_OPTIONS = [
+  "CMTIOS01", "CMTIOS02", "CMTIOS03", "CMTIOS04",
+  "CTTIOS01", "CTTIOS02",
+];
+const BASE_STATION_OPTIONS = ["BMS1ForceSide", "BMS2ForceSide"];
+const FORCE_TYPE_OPTIONS   = ["Opposing", "Friendly"];
 
 const CALL_SIGN_OPTIONS = [
   "09", "09Z", "08", "08Z", "07", "01",
@@ -35,35 +51,35 @@ const CALL_SIGN_OPTIONS = [
 ];
 
 /** Default cabin data for Standalone CMT — cabins 11 & 12 are occupied */
-const INITIAL_CABINS: CabinRow[] = [
-  { id: "CMT_CABIN_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_11", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_12", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+export const INITIAL_CABINS: CabinRow[] = [
+  { id: "CMT_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_11", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_12", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
 ];
 
 /** Cabin data for CMT+CTT — cabins 11 & 12 are selectable (not occupied) */
 export const CMTCTT_INITIAL_CABINS: CabinRow[] = [
-  { id: "CMT_CABIN_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "All role selected" },
-  { id: "CMT_CABIN_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_11", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_CABIN_12", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_11", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT_12", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
 ];
 
 const columnHelper = createColumnHelper<CabinRow>();
@@ -112,6 +128,81 @@ function TableDropdown({
               {value === opt && <Check size={11} className="text-brand-primary flex-shrink-0 ml-1" />}
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Searchable (Select2-style) dropdown used for Call Sign column */
+function SearchableTableDropdown({
+  value, onChange, options, placeholder,
+}: {
+  value: string; onChange: (v: string) => void; options: string[]; placeholder: string;
+}) {
+  const [open,   setOpen]   = useState(false);
+  const [search, setSearch] = useState("");
+  const ref     = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        setOpen(false);
+        setSearch("");
+      }
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  useEffect(() => {
+    if (open) setTimeout(() => inputRef.current?.focus(), 50);
+  }, [open]);
+
+  const filtered = options.filter(o => o.toLowerCase().includes(search.toLowerCase()));
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2 py-1.5 text-xs border border-gray-200 rounded-md text-gray-600 hover:border-gray-300 bg-white whitespace-nowrap transition-colors max-w-[160px] w-full"
+      >
+        <span className={cn("flex-1 text-left truncate", value ? "text-gray-800" : "text-gray-400")}>
+          {value || placeholder}
+        </span>
+        <ChevronDown size={11} className={cn("text-gray-400 flex-shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[50] min-w-[170px]">
+          {/* Search input */}
+          <div className="p-2 border-b border-gray-100">
+            <input
+              ref={inputRef}
+              type="text"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search..."
+              className="w-full px-2 py-1.5 text-xs border border-gray-200 rounded-md focus:outline-none focus:ring-1 focus:ring-brand-primary"
+            />
+          </div>
+          {/* Options list */}
+          <div className="max-h-40 overflow-y-auto py-1">
+            {filtered.length > 0 ? filtered.map(opt => (
+              <button
+                key={opt}
+                type="button"
+                onClick={() => { onChange(opt); setOpen(false); setSearch(""); }}
+                className="w-full flex items-center justify-between px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+              >
+                {opt}
+                {value === opt && <Check size={11} className="text-brand-primary flex-shrink-0 ml-1" />}
+              </button>
+            )) : (
+              <p className="px-3 py-2 text-xs text-gray-400 italic">No results</p>
+            )}
+          </div>
         </div>
       )}
     </div>
@@ -176,38 +267,57 @@ export function CMTCabinConfigStep({
   bookingDetails,
   weaponVariantOptions,
   initialCabins: initialCabinsProp,
+  initialIosList: initialIosListProp,
   showCallSign = true,
+  onIOSChange,
+  onCabinsChange,
+  gridCols = "grid-cols-[60%_40%]",
 }: {
   bookingDetails?:       CMTBookingDetailsValues | null;
   /** Overrides the default weapon variant list in the cabin table (e.g. for CMT+CTT with qty labels) */
   weaponVariantOptions?: string[];
   /** Overrides the default initial cabin data (e.g. CMT+CTT uses CMTCTT_INITIAL_CABINS) */
   initialCabins?:        CabinRow[];
+  /** Pre-populate IOS entries (e.g. loaded from localStorage for the detail page) */
+  initialIosList?:       IosEntry[];
   /** Whether to show the Call Sign column (default: true). Set false for CMT+CTT flow. */
   showCallSign?:         boolean;
+  /** Called whenever the IOS list changes — used to bubble state up to parent */
+  onIOSChange?:          (list: IosEntry[]) => void;
+  /** Called whenever the cabin list changes — used to bubble state up to parent */
+  onCabinsChange?:       (cabins: CabinRow[]) => void;
+  /** Tailwind grid-cols class for the table/IOS panel split. Default: "grid-cols-[60%_40%]" (60/40) */
+  gridCols?:             string;
 }) {
-  const [cabins,       setCabins]       = useState<CabinRow[]>(initialCabinsProp ?? INITIAL_CABINS);
-  const [mainIOS,      setMainIOS]      = useState("");
-  const [force,        setForce]        = useState("");
-  const [slaveIOSList, setSlaveIOSList] = useState<SlaveIOSEntry[]>([]);
+  const defaultIosList: IosEntry[] = [
+    { uid: 1, iosDevice: "", baseStation: "", masterIOS: "", forceType: "" },
+  ];
 
-  // ── Derive Main IOS options from platform variant quantities ─────────────────
-  const totalWeaponQty = useMemo(() => {
-    if (!bookingDetails?.platformVariants) return 0;
-    return bookingDetails.platformVariants
-      .filter((v: { selected: boolean; qty: number }) => v.selected)
-      .reduce((sum: number, v: { selected: boolean; qty: number }) => sum + v.qty, 0);
-  }, [bookingDetails]);
+  const [cabins,      setCabins]      = useState<CabinRow[]>(initialCabinsProp ?? INITIAL_CABINS);
+  const [iosList,     setIosList]     = useState<IosEntry[]>(initialIosListProp ?? defaultIosList);
+  /** uid of the IOS entry currently open in form-edit mode (null = all collapsed) */
+  const [editingUid, setEditingUid]   = useState<number | null>(initialIosListProp ? null : 1);
 
-  // Generate "Main IOS 1" … "Main IOS N" where N = total weapon qty
-  // Fall back to 4 when no booking details exist yet (e.g. navigated directly)
-  const mainIOSOptions = useMemo(
-    () => Array.from(
-      { length: Math.max(1, totalWeaponQty || 4) },
-      (_, i) => `Main IOS ${i + 1}`
-    ),
-    [totalWeaponQty]
-  );
+  // Bubble IOS list up to parent whenever it changes
+  const onIOSChangeRef = useRef(onIOSChange);
+  onIOSChangeRef.current = onIOSChange;
+  useEffect(() => {
+    onIOSChangeRef.current?.(iosList);
+  }, [iosList]);
+
+  // Bubble cabin list up to parent whenever it changes
+  const onCabinsChangeRef = useRef(onCabinsChange);
+  onCabinsChangeRef.current = onCabinsChange;
+  useEffect(() => {
+    onCabinsChangeRef.current?.(cabins);
+  }, [cabins]);
+
+  // ── Derive Platform Type options from booking details ─────────────────────────
+  // Only show variants the user actually selected in Booking Details step
+  const platformTypeOptions = useMemo(() => {
+    const selected = bookingDetails?.platformVariants?.filter(v => v.selected).map(v => v.label);
+    return selected && selected.length > 0 ? selected : (weaponVariantOptions ?? WEAPON_VARIANT_OPTIONS);
+  }, [bookingDetails, weaponVariantOptions]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
   const availableCabins  = cabins.filter(c => !c.occupied);
@@ -219,19 +329,13 @@ export function CMTCabinConfigStep({
   const toggleAll = useCallback(() => {
     const shouldSelect = !allSelected;
     setCabins(prev => prev.map(c =>
-      c.occupied ? c : {
-        ...c,
-        selected: shouldSelect,
-        role:     shouldSelect ? "All role selected" : "",
-      }
+      c.occupied ? c : { ...c, selected: shouldSelect }
     ));
   }, [allSelected]);
 
   const toggleCabin = useCallback((id: string) => {
     setCabins(prev => prev.map(c =>
-      c.id === id
-        ? { ...c, selected: !c.selected, role: !c.selected ? "All role selected" : "" }
-        : c
+      c.id === id ? { ...c, selected: !c.selected } : c
     ));
   }, []);
 
@@ -247,15 +351,20 @@ export function CMTCabinConfigStep({
     setCabins(prev => prev.map(c => c.id === id ? { ...c, role } : c));
   }, []);
 
-  // ── Slave IOS ───────────────────────────────────────────────────────────────
-  const addSlaveIOS = () =>
-    setSlaveIOSList(prev => [...prev, { uid: Date.now(), value: "" }]);
+  // ── IOS list helpers ────────────────────────────────────────────────────────
+  const addIOS = () => {
+    const newUid = Date.now();
+    setIosList(prev => [...prev, { uid: newUid, iosDevice: "", baseStation: "", masterIOS: "", forceType: "" }]);
+    setEditingUid(newUid);
+  };
 
-  const updateSlaveIOS = (uid: number, value: string) =>
-    setSlaveIOSList(prev => prev.map(s => s.uid === uid ? { ...s, value } : s));
+  const removeIOS = (uid: number) => {
+    setIosList(prev => prev.filter(e => e.uid !== uid));
+    setEditingUid(prev => prev === uid ? null : prev);
+  };
 
-  const removeSlaveIOS = (uid: number) =>
-    setSlaveIOSList(prev => prev.filter(s => s.uid !== uid));
+  const updateIOS = (uid: number, field: keyof Omit<IosEntry, "uid">, value: string) =>
+    setIosList(prev => prev.map(e => e.uid === uid ? { ...e, [field]: value } : e));
 
   // ── Table columns ───────────────────────────────────────────────────────────
   const columns = useMemo<(ColumnDef<CabinRow, any> & { minWidth?: string; maxWidth?: string; width?: string })[]>(() => {
@@ -317,15 +426,15 @@ export function CMTCabinConfigStep({
 
     columnHelper.display({
       id:     "weaponVariant",
-      header: () => "Weapon Variant",
+      header: () => "Platform Type",
       cell:   ({ row }) => row.original.occupied ? (
         <span className="text-sm text-gray-400 italic">Occupied</span>
       ) : (
         <TableDropdown
           value={row.original.weaponVariant}
           onChange={(v) => setWeaponVariant(row.original.id, v)}
-          options={weaponVariantOptions ?? WEAPON_VARIANT_OPTIONS}
-          placeholder="Weapon Variant"
+          options={platformTypeOptions}
+          placeholder="Platform Type"
         />
       ),
     }),
@@ -347,7 +456,7 @@ export function CMTCabinConfigStep({
       id:     "callSign",
       header: () => "Call Sign",
       cell:   ({ row }) => row.original.occupied ? null : (
-        <TableDropdown
+        <SearchableTableDropdown
           value={row.original.callSign}
           onChange={(v) => setCallSign(row.original.id, v)}
           options={CALL_SIGN_OPTIONS}
@@ -359,7 +468,7 @@ export function CMTCabinConfigStep({
     return showCallSign
       ? all
       : all.filter(col => (col as any).id !== "callSign");
-  }, [allSelected, someSelected, toggleAll, toggleCabin, setCallSign, setWeaponVariant, setRole, weaponVariantOptions, showCallSign]);
+  }, [allSelected, someSelected, toggleAll, toggleCabin, setCallSign, setWeaponVariant, setRole, platformTypeOptions, showCallSign]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
@@ -374,8 +483,8 @@ export function CMTCabinConfigStep({
         </h2>
       </div>
 
-      {/* 2-column layout */}
-      <div className="grid grid-cols-[1fr_420px] gap-4 items-start">
+      {/* Configurable layout split */}
+      <div className={cn("grid gap-4 items-start", gridCols)}>
 
         {/* ── LEFT: Cabin table ──────────────────────────────── */}
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -390,77 +499,187 @@ export function CMTCabinConfigStep({
           />
         </div>
 
-        {/* ── RIGHT: IOS Configuration ───────────────────────── */}
-        <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-4">
+        {/* ── RIGHT: IOS Configuration list ──────────────────── */}
+        <div className="bg-white rounded-xl border border-gray-200 p-4">
 
-          {/* Main IOS + Force Selection */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                Main IOS <span className="text-brand-primary">*</span>
-              </label>
-              <PanelDropdown
-                value={mainIOS}
-                onChange={setMainIOS}
-                options={mainIOSOptions}
-                placeholder="Choose main IOS"
-              />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-gray-700 mb-1.5">
-                Force Selection <span className="text-brand-primary">*</span>
-              </label>
-              <PanelDropdown
-                value={force}
-                onChange={setForce}
-                options={FORCE_OPTIONS}
-                placeholder="Choose force selection"
-              />
-            </div>
-          </div>
+          {/* IOS entries — full width, stacked vertically */}
+          <div className="flex flex-col gap-3">
+          {iosList.map((entry, idx) => {
+            const isEditing = editingUid === entry.uid;
+            const isFilled  = !!entry.iosDevice;
 
-          {/* Slave IOS entries */}
-          {slaveIOSList.length > 0 && (
-            <div className="space-y-3 border-t border-gray-100 pt-3">
-              {slaveIOSList.map((slave, idx) => (
-                <div key={slave.uid}>
-                  <div className="flex items-center justify-between mb-1.5">
-                    <label className="text-xs font-semibold text-gray-700">
-                      Slave IOS {idx + 1}
-                    </label>
+            /* ── Collapsed list-item card ── */
+            if (!isEditing) {
+              return (
+                <div key={entry.uid} className="rounded-lg border border-gray-200 bg-gray-50 px-3 py-2.5 flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-xs font-bold text-gray-700 mb-1">IOS {idx + 1}</p>
+                    {isFilled ? (
+                      <div className="flex flex-wrap gap-1.5">
+                        {[
+                          entry.iosDevice,
+                          entry.baseStation,
+                          entry.masterIOS ? `Master: ${entry.masterIOS}` : null,
+                          entry.forceType,
+                        ].filter(Boolean).map((chip, i) => (
+                          <span key={i} className="px-2 py-0.5 text-[10px] font-medium rounded-full bg-white border border-gray-200 text-gray-600 whitespace-nowrap">
+                            {chip}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 italic">Not configured</p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
                     <button
                       type="button"
-                      onClick={() => removeSlaveIOS(slave.uid)}
+                      onClick={() => setEditingUid(entry.uid)}
+                      className="text-[11px] font-medium text-brand-primary hover:underline transition-colors"
+                    >
+                      Edit
+                    </button>
+                    {iosList.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => removeIOS(entry.uid)}
+                        className="text-gray-400 hover:text-red-500 transition-colors ml-1"
+                      >
+                        <X size={12} />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            }
+
+            /* ── Expanded form card ── */
+            // IOS devices already chosen by other entries (exclude current entry so it can keep its own)
+            const usedIosDevices = iosList
+              .filter(e => e.uid !== entry.uid && e.iosDevice !== "")
+              .map(e => e.iosDevice);
+            const availableIosOptions = IOS_OPTIONS.filter(opt => !usedIosDevices.includes(opt));
+
+            return (
+              <div key={entry.uid} className="rounded-lg border border-brand-primary/30 bg-white p-3 space-y-3">
+                {/* Entry header */}
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">
+                    IOS {idx + 1}
+                  </span>
+                  {iosList.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => removeIOS(entry.uid)}
                       className="text-gray-400 hover:text-red-500 transition-colors"
                     >
                       <X size={13} />
                     </button>
-                  </div>
-                  <PanelDropdown
-                    value={slave.value}
-                    onChange={(v) => updateSlaveIOS(slave.uid, v)}
-                    options={mainIOSOptions}
-                    placeholder="Choose slave IOS"
-                  />
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
 
-          {/* Add Slave IOS button */}
-          <div className={cn(
-            "border border-dashed border-gray-200 rounded-lg py-4 flex justify-center",
-            slaveIOSList.length > 0 && "mt-0"
-          )}>
+                {/* Select IOS + Base Station — side by side */}
+                <div className="grid grid-cols-2 gap-2">
+                  {/* Select IOS */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Select IOS <span className="text-brand-primary">*</span>
+                    </label>
+                    <PanelDropdown
+                      value={entry.iosDevice}
+                      onChange={(v) => updateIOS(entry.uid, "iosDevice", v)}
+                      options={availableIosOptions}
+                      placeholder="Choose IOS"
+                    />
+                  </div>
+
+                  {/* Select Base Station */}
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Base Station <span className="text-brand-primary">*</span>
+                    </label>
+                    <PanelDropdown
+                      value={entry.baseStation}
+                      onChange={(v) => updateIOS(entry.uid, "baseStation", v)}
+                      options={BASE_STATION_OPTIONS}
+                      placeholder="Choose base station"
+                    />
+                  </div>
+                </div>
+
+                {/* Master IOS Yes / No */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    Master IOS <span className="text-brand-primary">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {(["Yes", "No"] as const).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => updateIOS(entry.uid, "masterIOS", opt)}
+                        className={cn(
+                          "flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors",
+                          entry.masterIOS === opt
+                            ? "bg-brand-primary text-white border-brand-primary"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                        )}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Force Type Opposing / Friendly */}
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                    Force Type <span className="text-brand-primary">*</span>
+                  </label>
+                  <div className="flex gap-2">
+                    {(FORCE_TYPE_OPTIONS as ("Opposing" | "Friendly")[]).map(opt => (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => updateIOS(entry.uid, "forceType", opt)}
+                        className={cn(
+                          "flex-1 py-1.5 text-xs font-medium rounded-lg border transition-colors",
+                          entry.forceType === opt
+                            ? "bg-brand-primary text-white border-brand-primary"
+                            : "bg-white text-gray-600 border-gray-200 hover:border-gray-300"
+                        )}
+                      >
+                        {opt}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Save button */}
+                <button
+                  type="button"
+                  onClick={() => setEditingUid(null)}
+                  className="w-full py-2 text-xs font-semibold bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover transition-colors"
+                >
+                  Save IOS {idx + 1}
+                </button>
+              </div>
+            );
+          })}
+
+          </div>{/* /grid grid-cols-2 */}
+
+          {/* Add Another IOS — spans full width */}
+          <div className="border border-dashed border-gray-200 rounded-lg py-3 flex justify-center mt-3">
             <button
               type="button"
-              onClick={addSlaveIOS}
+              onClick={addIOS}
               className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 transition-colors"
             >
               <div className="w-5 h-5 rounded-full border border-gray-300 flex items-center justify-center">
                 <Plus size={11} />
               </div>
-              Add Slave IOS
+              Add Another IOS
             </button>
           </div>
 

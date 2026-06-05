@@ -44,6 +44,11 @@ export function NominalRollTable({ trainees, status }: NominalRollTableProps) {
         header: "Platoon Number",
         accessorKey: "platoon",
       },
+      {
+        header: "Roles",
+        accessorKey: "roles",
+        cell: (info: any) => info.getValue() ?? "—",
+      },
     ];
 
     if (status !== "Overdue") {
