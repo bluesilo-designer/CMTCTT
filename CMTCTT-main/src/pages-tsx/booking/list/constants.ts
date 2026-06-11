@@ -4,7 +4,6 @@ export const tabs: TabType[] = [
   "Overall",
   "Upcoming",
   "Ongoing",
-  "Return Assets",
   "Completed",
   "Cancelled",
   "Overdue",

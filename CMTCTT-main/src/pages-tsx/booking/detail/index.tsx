@@ -7,6 +7,7 @@ import { CMTDetailListTab } from "./components/CMTDetailListTab";
 import { LaneConfigTable } from "./components/LaneConfigTable";
 import { BookingDetailListTab } from "./components/BookingDetailListTab";
 import { CMTCabinConfigStep } from "../create/components/CMTCabinConfigStep";
+import type { CabinRow } from "../create/components/CMTCabinConfigStep";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { CMTOnboardingFlow } from "./components/CMTOnboardingFlow";
 import { CMTCTTOnboardingFlow } from "./components/CMTCTTOnboardingFlow";
@@ -21,6 +22,22 @@ import {
 import { cn } from "@/lib/utils";
 import { bookings } from "@/data/mock";
 import { getCMTLocalBookingById, cmtLocalBookingToBooking } from "@/data/localBookings";
+
+// ── Pre-filled cabin data for Booking Detail view (demo) ─────────────────────
+const DETAIL_DEMO_CABINS: CabinRow[] = [
+  { id: "CMT01", occupied: false, selected: true,  callSign: "09",  weaponVariant: "40AGL", role: "VO,VC"     },
+  { id: "CMT02", occupied: false, selected: true,  callSign: "09Z", weaponVariant: "40AGL", role: "TC/PC,SC"  },
+  { id: "CMT03", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
+  { id: "CMT04", occupied: false, selected: true,  callSign: "08",  weaponVariant: "50HMG", role: "SO,VO"     },
+  { id: "CMT05", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
+  { id: "CMT06", occupied: false, selected: false, callSign: "08Z", weaponVariant: "50HMG", role: "VC"        },
+  { id: "CMT07", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
+  { id: "CMT08", occupied: false, selected: false, callSign: "07",  weaponVariant: "40AGL", role: "TC"        },
+  { id: "CMT09", occupied: false, unavailable: true, selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT10", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
+  { id: "CMT11", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
+  { id: "CMT12", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
+];
 
 // ── Mock booking base data ────────────────────────────────────────────────────
 const BOOKING_DATA = {
@@ -94,6 +111,10 @@ export function BookingDetail() {
   const [showAddTrainee, setShowAddTrainee] = useState(false);
   const [showDotMenu,           setShowDotMenu]           = useState(false);
   const [cmtDetailListGenerated, setCmtDetailListGenerated] = useState(false);
+  // Track unsaved changes in Nominal Roll / Cabin Config after Detail List is generated
+  const [nominalRollChanged,  setNominalRollChanged]  = useState(false);
+  const [cabinConfigChanged,  setCabinConfigChanged]   = useState(false);
+  const [showSyncConfirm,     setShowSyncConfirm]      = useState(false);
   const [cmtcttActiveTab, setCmtcttActiveTab] = useState("Booking Details");
   const dotMenuRef = useRef<HTMLDivElement>(null);
   const setBooking = useBookingStore((s) => s.setBooking);
@@ -258,8 +279,40 @@ export function BookingDetail() {
                 </Button>
               )}
 
-              {/* Start Onboarding for standalone CMT — only visible after Detail List is generated */}
-              {BOOKING.isCMT && !isCMTCTT && cmtDetailListGenerated && (
+              {/* Standalone CMT — buttons appear only after Detail List is generated */}
+              {BOOKING.isCMT && !isCMTCTT && cmtDetailListGenerated && (() => {
+                const hasChanges = nominalRollChanged || cabinConfigChanged;
+
+                return hasChanges ? (
+                  /* Data changed → show Confirm + Cancel */
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => { setNominalRollChanged(false); setCabinConfigChanged(false); }}
+                      className="px-5 py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+                    >
+                      Cancel
+                    </button>
+                    <Button
+                      onClick={() => setShowSyncConfirm(true)}
+                      className="px-5 py-2.5 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
+                    >
+                      Confirm
+                    </Button>
+                  </>
+                ) : (
+                  /* No changes → show Sync */
+                  <Button
+                    type="outline"
+                    className="px-5 py-2.5 text-sm font-semibold w-auto border border-gray-300 text-gray-700"
+                  >
+                    Sync
+                  </Button>
+                );
+              })()}
+
+              {/* Start Onboarding for standalone CMT — only when Ongoing (not Upcoming) */}
+              {BOOKING.isCMT && !isCMTCTT && cmtDetailListGenerated && BOOKING.status === "Ongoing" && (
                 <Button
                   onClick={() => setShowOnboarding(true)}
                   className="px-5 py-2.5 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
@@ -527,7 +580,11 @@ export function BookingDetail() {
           {!isCMTCTT && activeTab === "Nominal Rolls" && (
             BOOKING.isCMT ? (
               /* CMT — use the same table as the create-booking flow */
-              <CMTNominalRollDetail />
+              <CMTNominalRollDetail
+                onDataChange={() => {
+                  if (cmtDetailListGenerated) setNominalRollChanged(true);
+                }}
+              />
             ) : (
               /* Non-CMT — original nominal roll table */
               <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -589,8 +646,11 @@ export function BookingDetail() {
               <CMTCabinConfigStep
                 bookingDetails={null}
                 gridCols="grid-cols-[70%_30%]"
-                initialCabins={localData?.cabins}
+                initialCabins={localData?.cabins ?? DETAIL_DEMO_CABINS}
                 initialIosList={localData?.iosList}
+                onCabinsChange={() => {
+                  if (cmtDetailListGenerated) setCabinConfigChanged(true);
+                }}
               />
             );
           })()}
@@ -612,6 +672,50 @@ export function BookingDetail() {
       </div>
 
       {showReissue && <ReissueModal open={showReissue} onClose={() => setShowReissue(false)} />}
+
+      {/* Sync confirm popup */}
+      {showSyncConfirm && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-xl w-[440px] p-6">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-amber-600">
+                  <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+                  <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-800">Confirm Update</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Are you sure you want to update? This update requires you to re-generate the Detail List.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSyncConfirm(false)}
+                className="py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  // Reset changes and require re-generation of detail list
+                  setNominalRollChanged(false);
+                  setCabinConfigChanged(false);
+                  setCmtDetailListGenerated(false);
+                  setShowSyncConfirm(false);
+                }}
+                className="py-2.5 text-sm font-semibold bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover transition-colors"
+              >
+                Yes, Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showCoursewarePopup && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">

@@ -258,7 +258,7 @@ function AddTraineeSidebar({
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
-export function CMTNominalRollDetail() {
+export function CMTNominalRollDetail({ onDataChange }: { onDataChange?: () => void } = {}) {
   const [trainees,     setTrainees]     = useState<Trainee[]>(INITIAL_TRAINEES);
   const [dataCount,    setDataCount]    = useState<DemoSize>(10);
   const [searchQuery,  setSearchQuery]  = useState("");
@@ -400,7 +400,7 @@ export function CMTNominalRollDetail() {
             <button type="button" className="text-gray-400 hover:text-gray-600 transition-colors p-1">
               <Pencil size={13} />
             </button>
-            <button type="button" className="text-gray-400 hover:text-red-500 transition-colors p-1">
+            <button type="button" onClick={() => onDataChange?.()} className="text-gray-400 hover:text-red-500 transition-colors p-1">
               <Trash2 size={13} />
             </button>
           </div>
@@ -563,6 +563,7 @@ export function CMTNominalRollDetail() {
           onAdd={(t) => {
             setTrainees(prev => [...prev, t]);
             setCurrentPage(Math.ceil((filtered.length + 1) / PER_PAGE));
+            onDataChange?.();
           }}
         />
       )}
