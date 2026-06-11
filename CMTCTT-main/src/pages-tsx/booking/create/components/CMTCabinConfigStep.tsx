@@ -10,6 +10,8 @@ import type { CMTBookingDetailsValues } from "./CMTBookingDetailsStep";
 export interface CabinRow {
   id:            string;
   occupied:      boolean;
+  /** Temporarily unavailable (e.g. under maintenance) — displayed like Occupied but amber */
+  unavailable?:  boolean;
   selected:      boolean;
   callSign:      string;
   weaponVariant: string;
@@ -52,34 +54,34 @@ const CALL_SIGN_OPTIONS = [
 
 /** Default cabin data for Standalone CMT — cabins 11 & 12 are occupied */
 export const INITIAL_CABINS: CabinRow[] = [
-  { id: "CMT_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_11", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_12", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT09", occupied: false, unavailable: true, selected: false, callSign: "", weaponVariant: "", role: "" }, // Under maintenance
+  { id: "CMT10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT11", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT12", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
 ];
 
 /** Cabin data for CMT+CTT — cabins 11 & 12 are selectable (not occupied) */
 export const CMTCTT_INITIAL_CABINS: CabinRow[] = [
-  { id: "CMT_01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_09", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_11", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
-  { id: "CMT_12", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT01", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT02", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT03", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT04", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT05", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT06", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT07", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT08", occupied: false, selected: true,  callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT09", occupied: false, unavailable: true, selected: false, callSign: "", weaponVariant: "", role: "" }, // Under maintenance
+  { id: "CMT10", occupied: true,  selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT11", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
+  { id: "CMT12", occupied: false, selected: false, callSign: "", weaponVariant: "", role: "" },
 ];
 
 const columnHelper = createColumnHelper<CabinRow>();
@@ -128,6 +130,97 @@ function TableDropdown({
               {value === opt && <Check size={11} className="text-brand-primary flex-shrink-0 ml-1" />}
             </button>
           ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Multi-select dropdown for Role column — stores comma-separated values in role: string */
+function MultiRoleDropdown({ value, onChange }: {
+  value: string; onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener("mousedown", h);
+    return () => document.removeEventListener("mousedown", h);
+  }, []);
+
+  const selected   = value ? value.split(",").filter(Boolean) : [];
+  const allChecked = ROLE_OPTIONS.every(r => selected.includes(r));
+  const someChecked = selected.length > 0 && !allChecked;
+
+  const toggleAll = () => onChange(allChecked ? "" : ROLE_OPTIONS.join(","));
+
+  const toggleRole = (role: string) => {
+    const next = selected.includes(role)
+      ? selected.filter(r => r !== role)
+      : [...selected, role];
+    onChange(next.join(","));
+  };
+
+  const label = selected.length > 0 ? selected.join(", ") : "Select roles";
+
+  return (
+    <div ref={ref} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 px-2 py-1.5 text-xs border border-gray-200 rounded-md hover:border-gray-300 bg-white transition-colors w-full max-w-[180px]"
+      >
+        <span className={cn("flex-1 text-left truncate", selected.length > 0 ? "text-gray-800" : "text-gray-400")}>
+          {label}
+        </span>
+        <ChevronDown size={11} className={cn("text-gray-400 flex-shrink-0 transition-transform", open && "rotate-180")} />
+      </button>
+
+      {open && (
+        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-[50] py-1 min-w-[150px]">
+          {/* All */}
+          <button
+            type="button"
+            onClick={toggleAll}
+            className="w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold text-gray-700 hover:bg-gray-50"
+          >
+            <div className={cn(
+              "w-3.5 h-3.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+              allChecked  ? "bg-brand-primary border-brand-primary" :
+              someChecked ? "bg-brand-primary/20 border-brand-primary/50" : "border-gray-300",
+            )}>
+              {allChecked  && <Check size={8} className="text-white" strokeWidth={3} />}
+              {someChecked && !allChecked && <span className="w-1.5 h-0.5 bg-brand-primary block rounded-full" />}
+            </div>
+            All
+          </button>
+
+          <div className="h-px bg-gray-100 mx-2 my-0.5" />
+
+          {/* Core roles */}
+          {ROLE_OPTIONS.map(role => {
+            const checked = selected.includes(role);
+            return (
+              <button
+                key={role}
+                type="button"
+                onClick={() => toggleRole(role)}
+                className="w-full flex items-center gap-2 px-3 py-2 text-xs text-gray-700 hover:bg-gray-50"
+              >
+                <div className={cn(
+                  "w-3.5 h-3.5 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
+                  checked ? "bg-brand-primary border-brand-primary" : "border-gray-300",
+                )}>
+                  {checked && <Check size={8} className="text-white" strokeWidth={3} />}
+                </div>
+                {role}
+              </button>
+            );
+          })}
+
         </div>
       )}
     </div>
@@ -293,7 +386,20 @@ export function CMTCabinConfigStep({
     { uid: 1, iosDevice: "", baseStation: "", masterIOS: "", forceType: "" },
   ];
 
-  const [cabins,      setCabins]      = useState<CabinRow[]>(initialCabinsProp ?? INITIAL_CABINS);
+  const [cabins, setCabins] = useState<CabinRow[]>(() => {
+    const base   = initialCabinsProp ?? INITIAL_CABINS;
+    const amount = bookingDetails?.cabinAmount;
+    // If loaded from localStorage or no amount specified — use as-is
+    if (initialCabinsProp || !amount) return base;
+    // Pre-select exactly `amount` non-occupied cabins in order
+    let count = 0;
+    return base.map(c => {
+      if (c.occupied) return c;
+      const selected = count < amount;
+      if (selected) count++;
+      return { ...c, selected };
+    });
+  });
   const [iosList,     setIosList]     = useState<IosEntry[]>(initialIosListProp ?? defaultIosList);
   /** uid of the IOS entry currently open in form-edit mode (null = all collapsed) */
   const [editingUid, setEditingUid]   = useState<number | null>(initialIosListProp ? null : 1);
@@ -320,24 +426,66 @@ export function CMTCabinConfigStep({
   }, [bookingDetails, weaponVariantOptions]);
 
   // ── Derived values ──────────────────────────────────────────────────────────
-  const availableCabins  = cabins.filter(c => !c.occupied);
-  const selectedCount    = cabins.filter(c => !c.occupied && c.selected).length;
-  const allSelected      = availableCabins.length > 0 && availableCabins.every(c => c.selected);
-  const someSelected     = availableCabins.some(c => c.selected);
+  const availableCabins = cabins.filter(c => !c.occupied);
+  const selectedCount   = cabins.filter(c => !c.occupied && c.selected).length;
+  // Cap = cabinAmount from booking details (or all available if not specified)
+  const maxCabins       = bookingDetails?.cabinAmount ?? availableCabins.length;
+  const atMax           = selectedCount >= maxCabins;
+  const allSelected     = selectedCount > 0 && selectedCount >= Math.min(maxCabins, availableCabins.length);
+  const someSelected    = availableCabins.some(c => c.selected);
+
+  // Platform type quota: how many of each type the user allocated in Booking Details
+  const platformQuota = useMemo<Record<string, number>>(() => {
+    const q: Record<string, number> = {};
+    bookingDetails?.platformVariants?.filter(v => v.selected).forEach(v => { q[v.label] = v.qty; });
+    return q;
+  }, [bookingDetails]);
+
+  // Current usage: how many selected cabins have each platform type assigned
+  const platformUsage = useMemo<Record<string, number>>(() => {
+    const u: Record<string, number> = {};
+    cabins.filter(c => c.selected && c.weaponVariant).forEach(c => {
+      u[c.weaponVariant] = (u[c.weaponVariant] ?? 0) + 1;
+    });
+    return u;
+  }, [cabins]);
+
+  // Returns available options for a cabin, respecting per-type quotas
+  const availableVariantOptions = useCallback((currentValue: string) =>
+    platformTypeOptions.filter(opt => {
+      const quota = platformQuota[opt];
+      if (!quota) return true;                        // no quota → always available
+      const used = platformUsage[opt] ?? 0;
+      return used < quota || opt === currentValue;    // quota not reached, or already selected here
+    }),
+  [platformTypeOptions, platformQuota, platformUsage]);
 
   // ── Cabin state setters ─────────────────────────────────────────────────────
   const toggleAll = useCallback(() => {
-    const shouldSelect = !allSelected;
-    setCabins(prev => prev.map(c =>
-      c.occupied ? c : { ...c, selected: shouldSelect }
-    ));
-  }, [allSelected]);
+    if (allSelected) {
+      // Deselect all
+      setCabins(prev => prev.map(c => c.occupied ? c : { ...c, selected: false }));
+    } else {
+      // Select up to maxCabins in order
+      let count = 0;
+      setCabins(prev => prev.map(c => {
+        if (c.occupied) return c;
+        const sel = count < maxCabins;
+        if (sel) count++;
+        return { ...c, selected: sel };
+      }));
+    }
+  }, [allSelected, maxCabins]);
 
   const toggleCabin = useCallback((id: string) => {
-    setCabins(prev => prev.map(c =>
-      c.id === id ? { ...c, selected: !c.selected } : c
-    ));
-  }, []);
+    setCabins(prev => {
+      const cabin = prev.find(c => c.id === id);
+      if (!cabin || cabin.occupied) return prev;
+      // Block selecting a new cabin if already at the limit
+      if (!cabin.selected && prev.filter(c => !c.occupied && c.selected).length >= maxCabins) return prev;
+      return prev.map(c => c.id === id ? { ...c, selected: !c.selected } : c);
+    });
+  }, [maxCabins]);
 
   const setCallSign = useCallback((id: string, callSign: string) => {
     setCabins(prev => prev.map(c => c.id === id ? { ...c, callSign } : c));
@@ -389,22 +537,31 @@ export function CMTCabinConfigStep({
             {someSelected && !allSelected && <span className="w-2 h-px bg-brand-primary" />}
           </button>
         ),
-        cell: ({ row }) => (
-          row.original.occupied ? null : (
+        cell: ({ row }) => {
+          if (row.original.occupied || row.original.unavailable) return null;
+          const isUnavail = false;
+          const isDisabled = isUnavail || (!row.original.selected && atMax);
+          return (
             <button
               type="button"
-              onClick={() => toggleCabin(row.original.id)}
+              onClick={() => !isDisabled && toggleCabin(row.original.id)}
+              disabled={isDisabled}
+              title={isUnavail ? "Cabin unavailable — under maintenance" : undefined}
               className={cn(
                 "w-[18px] h-[18px] rounded border-2 flex items-center justify-center transition-colors",
                 row.original.selected
                   ? "bg-brand-primary border-brand-primary"
-                  : "border-gray-300 hover:border-gray-400"
+                  : isUnavail
+                    ? "border-amber-300 bg-amber-50 cursor-not-allowed"
+                    : isDisabled
+                      ? "border-gray-200 bg-gray-50 cursor-not-allowed opacity-40"
+                      : "border-gray-300 hover:border-gray-400"
               )}
             >
               {row.original.selected && <Check size={10} className="text-white" strokeWidth={3} />}
             </button>
-          )
-        ),
+          );
+        },
       }),
       minWidth: "48px",
       maxWidth: "48px",
@@ -429,11 +586,13 @@ export function CMTCabinConfigStep({
       header: () => "Platform Type",
       cell:   ({ row }) => row.original.occupied ? (
         <span className="text-sm text-gray-400 italic">Occupied</span>
+      ) : row.original.unavailable ? (
+        <span className="text-sm text-amber-600 italic font-medium">Unavailable</span>
       ) : (
         <TableDropdown
           value={row.original.weaponVariant}
           onChange={(v) => setWeaponVariant(row.original.id, v)}
-          options={platformTypeOptions}
+          options={availableVariantOptions(row.original.weaponVariant)}
           placeholder="Platform Type"
         />
       ),
@@ -442,12 +601,10 @@ export function CMTCabinConfigStep({
     columnHelper.display({
       id:     "role",
       header: () => "Role",
-      cell:   ({ row }) => row.original.occupied ? null : (
-        <TableDropdown
+      cell:   ({ row }) => row.original.occupied || row.original.unavailable ? null : (
+        <MultiRoleDropdown
           value={row.original.role}
           onChange={(v) => setRole(row.original.id, v)}
-          options={ROLE_OPTIONS}
-          placeholder="Assign role"
         />
       ),
     }),
@@ -455,7 +612,7 @@ export function CMTCabinConfigStep({
     columnHelper.display({
       id:     "callSign",
       header: () => "Call Sign",
-      cell:   ({ row }) => row.original.occupied ? null : (
+      cell:   ({ row }) => row.original.occupied || row.original.unavailable ? null : (
         <SearchableTableDropdown
           value={row.original.callSign}
           onChange={(v) => setCallSign(row.original.id, v)}
@@ -468,19 +625,52 @@ export function CMTCabinConfigStep({
     return showCallSign
       ? all
       : all.filter(col => (col as any).id !== "callSign");
-  }, [allSelected, someSelected, toggleAll, toggleCabin, setCallSign, setWeaponVariant, setRole, platformTypeOptions, showCallSign]);
+  }, [allSelected, someSelected, toggleAll, toggleCabin, setCallSign, setWeaponVariant, setRole, platformTypeOptions, availableVariantOptions, showCallSign]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 overflow-auto bg-gray-50 p-6">
       {/* Page header */}
       <div className="mb-5">
-        <h2 className="text-base font-semibold text-gray-800">
-          Cabin Configuration{" "}
-          <span className="font-normal text-gray-500 text-sm">
-            ({selectedCount}/{availableCabins.length} cabins selected)
-          </span>
-        </h2>
+        <div className="flex items-center gap-3 mb-3">
+          <h2 className="text-base font-semibold text-gray-800">
+            Cabin Configuration{" "}
+            <span className="font-normal text-gray-500 text-sm">
+              ({selectedCount}/{maxCabins} cabin{maxCabins !== 1 ? "s" : ""} selected)
+            </span>
+          </h2>
+        </div>
+
+        {/* Platform type quota bar — only shown when quota is defined from Booking Details */}
+        {Object.keys(platformQuota).length > 0 && (
+          <div className="flex items-center gap-3 flex-wrap">
+            <span className="text-xs text-gray-400 font-medium">Platform quota:</span>
+            {Object.entries(platformQuota).map(([label, quota]) => {
+              const used      = platformUsage[label] ?? 0;
+              const remaining = quota - used;
+              const full      = remaining <= 0;
+              return (
+                <div
+                  key={label}
+                  className={cn(
+                    "flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium",
+                    full
+                      ? "bg-red-50 border-red-200 text-brand-primary"
+                      : "bg-white border-gray-200 text-gray-600"
+                  )}
+                >
+                  <span className="font-semibold">{label}</span>
+                  <span className={cn("font-mono", full ? "text-brand-primary" : "text-gray-500")}>
+                    {used}/{quota}
+                  </span>
+                  {full && (
+                    <span className="text-[10px] text-brand-primary font-bold">FULL</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Configurable layout split */}
@@ -495,7 +685,13 @@ export function CMTCabinConfigStep({
             actionSticky={false}
             classTheadTh="!px-4 !py-3 !text-xs"
             classTBodyTd="!px-4 !py-2.5 !h-auto"
-            getRowClass={(row) => row.selected ? "bg-red-50" : ""}
+            getRowClass={(row) =>
+              row.unavailable
+                ? "bg-amber-50/60"
+                : row.selected
+                  ? "bg-red-50"
+                  : ""
+            }
           />
         </div>
 

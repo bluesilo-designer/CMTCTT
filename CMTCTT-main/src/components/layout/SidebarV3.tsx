@@ -57,7 +57,6 @@ const navGroups: { label: string; items: NavItem[] }[] = [
       { label: "Training Results",        icon: <GraduationCap size={16} />, path: "/training-results"        },
       { label: "Resource Planning",       icon: <Boxes size={16} />,         path: "/resource-planning"       },
       { label: "Operational Availability",icon: <Shield size={16} />,        path: "/operational-availability"},
-      { label: "Operational Availability 2", icon: <Shield size={16} />,    path: "/operational-availability-2" },
       {
         label: "System Hardware",
         icon: <Cpu size={16} />,

@@ -1,5 +1,6 @@
-export type ViewMode = "Day" | "Week" | "Month";
-export type SessionType = "AM" | "PM" | "Full" | "Hr" | "Ad";
+export type ViewMode     = "Day" | "Week" | "Month";
+export type BookingType  = "All" | "CMT" | "SWT" | "CMT CTT";
+export type SessionType  = "AM" | "PM" | "Full" | "Hr" | "Ad";
 export type BookingStatus = "Completed" | "Ongoing" | "Upcoming";
 
 export interface WeekCell {

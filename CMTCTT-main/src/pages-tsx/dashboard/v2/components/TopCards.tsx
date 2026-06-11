@@ -1,57 +1,98 @@
 import { cn } from "@/lib/utils";
+import { bookingTypeStats } from "../constants";
+import type { BookingType } from "../types";
 
-export function TopCards() {
+// ── Per-type colour tokens ─────────────────────────────────────────────────────
+
+const TYPE_STYLE: Record<"CMT" | "SWT" | "CMT CTT", {
+  badge: string; bar: string; accent: string; ongoing: string; upcoming: string; completed: string;
+}> = {
+  CMT: {
+    badge:     "bg-red-50 text-brand-primary",
+    bar:       "bg-brand-primary/20",
+    accent:    "text-brand-primary",
+    ongoing:   "bg-brand-primary",
+    upcoming:  "bg-red-200",
+    completed: "bg-emerald-300",
+  },
+  SWT: {
+    badge:     "bg-blue-50 text-blue-600",
+    bar:       "bg-blue-100",
+    accent:    "text-blue-600",
+    ongoing:   "bg-blue-400",
+    upcoming:  "bg-blue-200",
+    completed: "bg-emerald-300",
+  },
+  "CMT CTT": {
+    badge:     "bg-violet-50 text-violet-600",
+    bar:       "bg-violet-100",
+    accent:    "text-violet-600",
+    ongoing:   "bg-violet-400",
+    upcoming:  "bg-violet-200",
+    completed: "bg-emerald-300",
+  },
+};
+
+interface Props {
+  activeType: BookingType;
+}
+
+export function TopCards({ activeType }: Props) {
+  const types = ["CMT", "SWT", "CMT CTT"] as const;
+
   return (
-    <div className="grid grid-cols-2 gap-4 mb-4">
-      {/* Today's Bookings */}
-      <div className="bg-white rounded-xl border border-red-50 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Today's Bookings</span>
-          <span className="text-xs font-semibold text-red-400 bg-red-50 px-2 py-0.5 rounded-full">83% done</span>
-        </div>
-        <div className="grid grid-cols-4 gap-4 mb-3">
-          {[
-            { label: "Total",    value: 24, color: "text-gray-700"    },
-            { label: "Done",     value: 20, color: "text-emerald-500" },
-            { label: "Ongoing",  value: 8,  color: "text-amber-500"   },
-            { label: "Awaiting", value: 4,  color: "text-red-400"     },
-          ].map(({ label, value, color }) => (
-            <div key={label}>
-              <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-              <p className={cn("text-3xl font-bold", color)}>{value}</p>
-            </div>
-          ))}
-        </div>
-        <div className="h-1 rounded-full bg-gray-100 overflow-hidden flex gap-0.5">
-          <div className="bg-emerald-300 rounded-full" style={{ width: "83%" }} />
-          <div className="bg-amber-200 rounded-full"   style={{ width: "10%" }} />
-          <div className="bg-red-200 rounded-full"     style={{ width: "7%"  }} />
-        </div>
-      </div>
+    <div className="grid grid-cols-3 gap-4 mb-4">
+      {types.map((type) => {
+        const stats  = bookingTypeStats[type];
+        const style  = TYPE_STYLE[type];
+        const isActive = activeType === "All" || activeType === type;
+        const pctDone  = Math.round((stats.completed / stats.total) * 100);
+        const pctOn    = Math.round((stats.ongoing   / stats.total) * 100);
+        const pctUp    = 100 - pctDone - pctOn;
 
-      {/* Asset Overview */}
-      <div className="bg-white rounded-xl border border-red-50 p-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-gray-400 uppercase tracking-wide">Asset Overview</span>
-          <span className="text-xs font-semibold text-red-400 bg-red-50 px-2 py-0.5 rounded-full">83% returned</span>
-        </div>
-        <div className="grid grid-cols-3 gap-4 mb-3">
-          {[
-            { label: "Total Issued",   value: 24, color: "text-gray-700"    },
-            { label: "Returned",       value: 20, color: "text-emerald-500" },
-            { label: "Pending Return", value: 8,  color: "text-amber-500"   },
-          ].map(({ label, value, color }) => (
-            <div key={label}>
-              <p className="text-xs text-gray-400 mb-0.5">{label}</p>
-              <p className={cn("text-3xl font-bold", color)}>{value}</p>
+        return (
+          <div
+            key={type}
+            className={cn(
+              "bg-white rounded-xl border p-5 transition-all",
+              isActive ? "border-gray-100 shadow-sm" : "border-gray-100 opacity-40",
+            )}
+          >
+            {/* Header */}
+            <div className="flex items-start justify-between mb-4">
+              <div>
+                <span className={cn("text-[10px] font-bold px-2 py-0.5 rounded-full", style.badge)}>
+                  {type}
+                </span>
+                <p className="text-[11px] text-gray-400 mt-1">{stats.desc}</p>
+              </div>
+              <span className={cn("text-2xl font-extrabold", style.accent)}>{stats.total}</span>
             </div>
-          ))}
-        </div>
-        <div className="h-1 rounded-full bg-gray-100 overflow-hidden flex gap-0.5">
-          <div className="bg-emerald-300 rounded-full" style={{ width: "83%" }} />
-          <div className="bg-amber-200 rounded-full"   style={{ width: "17%" }} />
-        </div>
-      </div>
+
+            {/* Stats row */}
+            <div className="grid grid-cols-3 gap-2 mb-4">
+              {[
+                { label: "Ongoing",   value: stats.ongoing,   color: style.accent },
+                { label: "Upcoming",  value: stats.upcoming,  color: "text-gray-500" },
+                { label: "Completed", value: stats.completed, color: "text-emerald-500" },
+              ].map(({ label, value, color }) => (
+                <div key={label} className="text-center bg-gray-50 rounded-lg py-2">
+                  <p className="text-[10px] text-gray-400 mb-0.5">{label}</p>
+                  <p className={cn("text-xl font-bold", color)}>{value}</p>
+                </div>
+              ))}
+            </div>
+
+            {/* Progress bar */}
+            <div className="h-1.5 rounded-full bg-gray-100 overflow-hidden flex gap-px">
+              <div className={cn("rounded-full", style.completed)} style={{ width: `${pctDone}%` }} />
+              <div className={cn("rounded-full", style.ongoing)}   style={{ width: `${pctOn}%`  }} />
+              <div className={cn("rounded-full", style.upcoming)}  style={{ width: `${pctUp}%`  }} />
+            </div>
+            <p className="text-[10px] text-gray-400 mt-1.5 text-right">{pctDone}% completed</p>
+          </div>
+        );
+      })}
     </div>
   );
 }

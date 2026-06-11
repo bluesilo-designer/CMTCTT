@@ -92,7 +92,8 @@ export function BookingDetail() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [showCoursewarePopup, setShowCoursewarePopup] = useState(false);
   const [showAddTrainee, setShowAddTrainee] = useState(false);
-  const [showDotMenu, setShowDotMenu] = useState(false);
+  const [showDotMenu,           setShowDotMenu]           = useState(false);
+  const [cmtDetailListGenerated, setCmtDetailListGenerated] = useState(false);
   const [cmtcttActiveTab, setCmtcttActiveTab] = useState("Booking Details");
   const dotMenuRef = useRef<HTMLDivElement>(null);
   const setBooking = useBookingStore((s) => s.setBooking);
@@ -221,8 +222,8 @@ export function BookingDetail() {
             </div>
 
             <div className="flex flex-col sm:flex-row gap-3">
-              {/* Issue Assets dropdown */}
-              {BOOKING.status !== "Overdue" && (
+              {/* Issue Assets dropdown — hidden for CMT Upcoming (no asset management for CMT) */}
+              {BOOKING.status !== "Overdue" && !(BOOKING.isCMT && BOOKING.status === "Upcoming") && (
                 <div className="relative">
                   <Button
                     type="outline"
@@ -247,13 +248,23 @@ export function BookingDetail() {
                 </div>
               )}
 
-              {/* Onboarding is only for CMT+CTT — hidden for standalone CMT */}
+              {/* Onboarding for CMT+CTT */}
               {["Ongoing", "Upcoming"].includes(BOOKING.status) && isCMTCTT && (
                 <Button
                   onClick={() => setShowOnboarding(true)}
                   className="px-5 py-2.5 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
                 >
                   {BOOKING.status === "Ongoing" ? "Continue Session" : "Start Onboarding"}
+                </Button>
+              )}
+
+              {/* Start Onboarding for standalone CMT — only visible after Detail List is generated */}
+              {BOOKING.isCMT && !isCMTCTT && cmtDetailListGenerated && (
+                <Button
+                  onClick={() => setShowOnboarding(true)}
+                  className="px-5 py-2.5 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
+                >
+                  Start Onboarding
                 </Button>
               )}
 
@@ -586,7 +597,7 @@ export function BookingDetail() {
 
           {!isCMTCTT && activeTab === "Detail List" && (
             BOOKING.isCMT
-              ? <CMTDetailListTab status={BOOKING.status} />
+              ? <CMTDetailListTab status={BOOKING.status} onGenerated={() => setCmtDetailListGenerated(true)} />
               : (
                 <BookingDetailListTab
                   bookingTitle={BOOKING.title}

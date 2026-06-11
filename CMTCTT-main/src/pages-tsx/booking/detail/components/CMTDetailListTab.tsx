@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import {
   Clock, UserCheck, UserX,
-  Download, Upload, FileText, CheckCircle2, Circle, ChevronRight,
+  Download, Upload, FileText, CheckCircle2, ChevronRight, FileDown, Settings2,
 } from "lucide-react";
 import { Button } from "@/components/button";
 import { Modal } from "@/components/modal-1";
 import { cn } from "@/lib/utils";
+import { CMTConfigureDetailList } from "./CMTConfigureDetailList";
+import type { EditableCabin } from "./CMTConfigureDetailList";
+import { DemoSwitcher, type DemoSize } from "./DemoSwitcher";
 
 // ── Mock cabin / cluster groups ────────────────────────────────────────────────
 
@@ -39,19 +42,19 @@ const CABIN_GROUPS: Array<{
     ],
   },
   {
-    cabin: "CTT01", platformType: "L2SG", callsign: "22Z",
+    cabin: "CMT03", platformType: "L2SG", callsign: "22Z",
     trainees: [
-      { role: "VO", name: "Trainee6",  nric: "S7521418A", rank: "PTE", batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
-      { role: "VC", name: "Trainee7",  nric: "S9521418Z", rank: "MAJ", batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
+      { role: "VO", name: "Ahmad Firdaus",   nric: "S7521418A", rank: "PTE", batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
+      { role: "VC", name: "Ng Jian Wei",     nric: "S9521418Z", rank: "MAJ", batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
     ],
   },
   {
-    cabin: "CTT04", platformType: "PCSV Mortar", callsign: "14SZ",
+    cabin: "CMT04", platformType: "PCSV Mortar", callsign: "14SZ",
     trainees: [
-      { role: "VO", name: "Trainee13", nric: "T0192258G", rank: "PTE",                   batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
-      { role: "VC", name: "Trainee14", nric: "T0255758A", rank: "MAJ",                   batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
-      { role: "TC", name: "Trainee15", nric: "T0377737Z", rank: "MAJ", callsign: "14S",  batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
-      { role: "SO", name: "Trainee16", nric: "T0488228Z", rank: "PTE", callsign: "14B",  batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
+      { role: "VO", name: "Hafiz Rahman",    nric: "T0192258G", rank: "PTE",                   batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
+      { role: "VC", name: "Tan Wei Ming",    nric: "T0255758A", rank: "MAJ",                   batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
+      { role: "TC", name: "Lim Jun Xian",    nric: "T0377737Z", rank: "MAJ", callsign: "14S",  batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
+      { role: "SO", name: "Syed Farhan",     nric: "T0488228Z", rank: "PTE", callsign: "14B",  batch: "06/26", course: "IOCC_2(TRX)", unit: "2SIR" },
     ],
   },
 ];
@@ -94,38 +97,6 @@ function useCountdown(initial: number) {
   const mm = String(Math.floor((secs % 3600) / 60)).padStart(2, "0");
   const ss = String(secs % 60).padStart(2, "0");
   return `${hh}:${mm}:${ss}`;
-}
-
-// ── Verification card ──────────────────────────────────────────────────────────
-
-function VerificationCard({
-  title, description, checked, onToggle,
-}: {
-  title: string; description: string; checked: boolean; onToggle: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onToggle}
-      className={cn(
-        "flex items-start gap-3 w-full text-left p-4 rounded-xl border-2 transition-all",
-        checked
-          ? "border-green-500 bg-green-50"
-          : "border-gray-200 bg-white hover:border-gray-300",
-      )}
-    >
-      {checked
-        ? <CheckCircle2 size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
-        : <Circle      size={20} className="text-gray-300 flex-shrink-0 mt-0.5" />
-      }
-      <div>
-        <p className={cn("text-sm font-semibold", checked ? "text-green-700" : "text-gray-700")}>
-          {title}
-        </p>
-        <p className="text-xs text-gray-400 mt-0.5">{description}</p>
-      </div>
-    </button>
-  );
 }
 
 // ── Cabin detail modal ─────────────────────────────────────────────────────────
@@ -261,19 +232,20 @@ function CabinCard({
 
 export function CMTDetailListTab({
   status = "Upcoming",
+  onGenerated,
 }: {
-  status?: string;
+  status?:      string;
+  onGenerated?: () => void;
 }) {
   const timer = useCountdown(20 * 60 + 18);
 
-  const [nominalRollDone, setNominalRollDone] = useState(false);
-  const [cabinConfigDone, setCabinConfigDone] = useState(false);
-  const [confirmed,       setConfirmed]       = useState(false);
-  const [isGenerated,     setIsGenerated]     = useState(false);
-  const [uploadedFile,    setUploadedFile]    = useState<string | null>(null);
-  const [selectedGroup,   setSelectedGroup]   = useState<CabinGroup | null>(null);
-
-  const bothChecked = nominalRollDone && cabinConfigDone;
+  const [confirmed,        setConfirmed]        = useState(false);
+  const [isGenerated,      setIsGenerated]      = useState(false);
+  const [uploadedFile,     setUploadedFile]     = useState<string | null>(null);
+  const [selectedGroup,    setSelectedGroup]    = useState<CabinGroup | null>(null);
+  const [showConfigure,    setShowConfigure]    = useState(false);
+  const [configuredCabins, setConfiguredCabins] = useState<EditableCabin[] | null>(null);
+  const [dataCount,        setDataCount]        = useState<DemoSize>(10);
   const passCount   = 6;
   const failCount   = 3;
   const marksman    = 5;
@@ -295,19 +267,23 @@ export function CMTDetailListTab({
             </p>
           </div>
 
+          {/* Auto-completed status cards */}
           <div className="grid grid-cols-2 gap-3">
-            <VerificationCard
-              title="Nominal Roll"
-              description="Upload your trainee nominal roll data"
-              checked={nominalRollDone}
-              onToggle={() => { setNominalRollDone(v => !v); setConfirmed(false); }}
-            />
-            <VerificationCard
-              title="Cabin Configuration"
-              description="Complete the cabin assignment configuration"
-              checked={cabinConfigDone}
-              onToggle={() => { setCabinConfigDone(v => !v); setConfirmed(false); }}
-            />
+            {[
+              { title: "Nominal Roll",         description: "Trainee nominal roll data uploaded" },
+              { title: "Cabin Configuration",  description: "Cabin assignment configuration complete" },
+            ].map(({ title, description }) => (
+              <div
+                key={title}
+                className="flex items-start gap-3 p-4 rounded-xl border-2 border-green-500 bg-green-50"
+              >
+                <CheckCircle2 size={20} className="text-green-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-green-700">{title}</p>
+                  <p className="text-xs text-gray-400 mt-0.5">{description}</p>
+                </div>
+              </div>
+            ))}
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
@@ -346,15 +322,12 @@ export function CMTDetailListTab({
 
           <button
             type="button"
-            disabled={!bothChecked}
             onClick={() => setConfirmed(v => !v)}
             className={cn(
               "w-full flex items-center gap-3 px-4 py-3.5 rounded-xl border-2 transition-all text-left",
-              !bothChecked
-                ? "border-gray-100 bg-gray-50 cursor-not-allowed opacity-50"
-                : confirmed
-                  ? "border-brand-primary bg-red-50"
-                  : "border-gray-200 bg-white hover:border-gray-300",
+              confirmed
+                ? "border-brand-primary bg-red-50"
+                : "border-gray-200 bg-white hover:border-gray-300",
             )}
           >
             <div className={cn(
@@ -377,7 +350,7 @@ export function CMTDetailListTab({
 
           {confirmed && (
             <Button
-              onClick={() => setIsGenerated(true)}
+              onClick={() => { setIsGenerated(true); onGenerated?.(); }}
               className="w-full py-3 text-sm font-semibold bg-brand-primary text-white hover:bg-brand-primary-hover flex items-center justify-center gap-2"
             >
               Generate Detail List
@@ -459,9 +432,10 @@ export function CMTDetailListTab({
           <div className="flex items-center gap-2">
             <Button
               type="outline"
-              className="px-4 py-2 text-sm font-semibold w-auto border border-brand-primary text-brand-primary hover:bg-red-50"
+              onClick={() => setShowConfigure(true)}
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold w-auto border border-gray-200 text-gray-600 hover:bg-gray-50"
             >
-              Live Results
+              <Settings2 size={14} /> Configure
             </Button>
             <Button
               type="outline"
@@ -469,12 +443,17 @@ export function CMTDetailListTab({
             >
               <Download size={14} /> Export
             </Button>
+            <Button
+              className="flex items-center gap-1.5 px-4 py-2 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
+            >
+              <FileDown size={14} /> Download
+            </Button>
           </div>
         </div>
 
-        {/* 3-column card grid */}
+        {/* 3-column card grid — sliced by demo switcher */}
         <div className="grid grid-cols-3 gap-4">
-          {CABIN_GROUPS.map((group) => (
+          {CABIN_GROUPS.slice(0, dataCount).map((group) => (
             <CabinCard
               key={group.cabin}
               group={group}
@@ -490,6 +469,30 @@ export function CMTDetailListTab({
         <CabinDetailModal
           group={selectedGroup}
           onClose={() => setSelectedGroup(null)}
+        />
+      )}
+
+      {/* Configure overlay */}
+      {/* ── Floating demo switcher — only in generated state ── */}
+      <DemoSwitcher value={dataCount} onChange={setDataCount} />
+
+      {showConfigure && (
+        <CMTConfigureDetailList
+          initialCabins={
+            configuredCabins
+              ? configuredCabins.map(c => ({
+                  cabin:        c.cabin,
+                  platformType: c.platformType,
+                  callsign:     c.callsign,
+                  trainees:     c.trainees,
+                }))
+              : CABIN_GROUPS
+          }
+          onClose={() => setShowConfigure(false)}
+          onSave={(saved) => {
+            setConfiguredCabins(saved);
+            setShowConfigure(false);
+          }}
         />
       )}
     </>

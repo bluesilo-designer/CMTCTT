@@ -1,10 +1,11 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
-import type { SessionType, BookingStatus } from "../types";
+import type { SessionType, BookingStatus, BookingType } from "../types";
 import {
-  STATIONS,
-  weekData,
-  weekDailyCounts,
+  weekDataByType,
+  stationsByType,
+  weekDailyCountsByType,
+  UNAVAILABLE_STATIONS,
   sessionColors,
   statusDot,
   WEEK_DAYS,
@@ -12,13 +13,21 @@ import {
   TODAY_IDX,
 } from "../constants";
 
-export function WeekView() {
+interface Props {
+  bookingType: BookingType;
+}
+
+export function WeekView({ bookingType }: Props) {
   const [activeFilters, setActiveFilters] = useState<SessionType[]>(["AM", "PM", "Full", "Hr", "Ad"]);
 
   const toggleFilter = (t: SessionType) =>
     setActiveFilters((prev) =>
       prev.includes(t) ? prev.filter((x) => x !== t) : [...prev, t]
     );
+
+  const stations     = stationsByType[bookingType];
+  const weekData     = weekDataByType[bookingType];
+  const dailyCounts  = weekDailyCountsByType[bookingType];
 
   return (
     <div className="bg-white rounded-xl border border-red-50/80">
@@ -31,23 +40,21 @@ export function WeekView() {
         <div className="flex items-center gap-4 text-xs text-slate-400">
           {(["Completed", "Ongoing", "Upcoming"] as BookingStatus[]).map((s) => (
             <div key={s} className="flex items-center gap-1.5">
-              <div
-                className={cn(
-                  "w-2.5 h-2.5 rounded-sm",
-                  s === "Completed" ? "bg-emerald-200" :
-                  s === "Ongoing"   ? "bg-amber-200"   : "bg-sky-200"
-                )}
-              />
+              <div className={cn(
+                "w-2.5 h-2.5 rounded-sm",
+                s === "Completed" ? "bg-emerald-200" :
+                s === "Ongoing"   ? "bg-amber-200"   : "bg-sky-200"
+              )} />
               <span>{s}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Session type filter toggle buttons (tab-style, stay raw per IMT rules) */}
+      {/* Session type filter */}
       <div className="flex items-center gap-2 px-5 py-2.5 border-b border-slate-100">
         {(["AM", "PM", "Full", "Hr", "Ad"] as SessionType[]).map((t) => {
-          const c = sessionColors[t];
+          const c      = sessionColors[t];
           const active = activeFilters.includes(t);
           return (
             <button
@@ -65,7 +72,7 @@ export function WeekView() {
         })}
       </div>
 
-      {/* Grid — raw table is intentional here: this is a bespoke schedule grid, not a data table */}
+      {/* Grid */}
       <div className="overflow-x-auto">
         <table className="w-full min-w-[800px]">
           <thead>
@@ -82,15 +89,30 @@ export function WeekView() {
             </tr>
           </thead>
           <tbody>
-            {STATIONS.map((station) => {
-              const stationBookings = Object.values(weekData[station] ?? {}).flat().length;
+            {stations.map((station) => {
+              const isUnavail = UNAVAILABLE_STATIONS.has(station);
+              const stationBookings = isUnavail
+                ? 0
+                : Object.values(weekData[station] ?? {}).flat().length;
+
               return (
-                <tr key={station} className="border-t border-slate-50">
+                <tr key={station} className={cn("border-t border-slate-50", isUnavail && "bg-amber-50/40")}>
                   <td className="px-4 py-3 text-left">
-                    <div className="text-xs font-bold text-slate-600">{station}</div>
-                    <div className="text-[10px] text-slate-400">{stationBookings} bookings</div>
+                    <div className={cn("text-xs font-bold", isUnavail ? "text-amber-500" : "text-slate-600")}>
+                      {station}
+                    </div>
+                    <div className="text-[10px] text-slate-400">
+                      {isUnavail ? "Under maintenance" : `${stationBookings} bookings`}
+                    </div>
                   </td>
                   {WEEK_DAYS.map((day, di) => {
+                    if (isUnavail) {
+                      return (
+                        <td key={day} className={cn("px-1.5 py-2", di === TODAY_IDX ? "bg-red-50/20" : "")}>
+                          <div className="h-8 flex items-center justify-center text-amber-200 text-xs">–</div>
+                        </td>
+                      );
+                    }
                     const cells = (weekData[station]?.[day] ?? []).filter((c) =>
                       activeFilters.includes(c.type)
                     );
@@ -126,9 +148,10 @@ export function WeekView() {
                 </tr>
               );
             })}
+            {/* Daily total row */}
             <tr className="border-t border-slate-100 bg-slate-50/50">
               <td className="px-4 py-2 text-xs font-semibold text-slate-400">Daily</td>
-              {weekDailyCounts.map((count, i) => (
+              {dailyCounts.map((count, i) => (
                 <td
                   key={i}
                   className={cn(

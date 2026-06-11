@@ -41,7 +41,8 @@ const CMT_TRAINEES = [
   { rank: "REC", name: "Caleb Chan",      nric: "*****212D", battalion: "5th", company: "AA", section: "5", appointment: "-", platoon: "Platoon 4", roles: "SC" },
 ];
 
-const PER_PAGE = 10;
+const PER_PAGE      = 10;
+const DATA_SIZES    = [3, 5, 10, 15] as const;
 
 type Trainee = typeof CMT_TRAINEES[number];
 
@@ -61,15 +62,19 @@ export function CMTNominalRollStep({
   const [currentPage,  setCurrentPage]  = useState(1);
   const [showUpload,   setShowUpload]   = useState(false);
   const [showReview,   setShowReview]   = useState(false);
+  const [dataCount,    setDataCount]    = useState<typeof DATA_SIZES[number]>(10);
 
   // ── Filtering & pagination ────────────────────────────────────────────────
+  // Slice mock data first according to selected count, then apply search filter
+  const activeTrainees = useMemo(() => trainees.slice(0, dataCount), [trainees, dataCount]);
+
   const filtered = useMemo(
-    () => trainees.filter(t =>
+    () => activeTrainees.filter(t =>
       !searchQuery ||
       t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       t.nric.includes(searchQuery)
     ),
-    [trainees, searchQuery],
+    [activeTrainees, searchQuery],
   );
   const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
@@ -161,7 +166,7 @@ export function CMTNominalRollStep({
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-base font-semibold text-gray-800">
             Nominal Roll{" "}
-            <span className="font-normal text-gray-500">({trainees.length} Trainees)</span>
+            <span className="font-normal text-gray-500">({activeTrainees.length} Trainees)</span>
           </h2>
 
           <div className="flex items-center gap-2">
@@ -231,7 +236,7 @@ export function CMTNominalRollStep({
       {/* Review modal */}
       {showReview && (
         <CMTReviewModal
-          totalTrainees={trainees.length}
+          totalTrainees={activeTrainees.length}
           bookingType={bookingDetails?.bookingType ?? "Compartment Selection"}
           cabin={bookingDetails?.cabinAmount ?? 1}
           vehicleType={bookingDetails?.vehicleType ?? "ICV (TERREX)"}
@@ -271,6 +276,25 @@ export function CMTNominalRollStep({
           onConfirm={() => { setShowReview(false); onNext(); }}
         />
       )}
+
+      {/* ── Floating data-count switcher (demo control) ── */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-1.5 bg-white border border-gray-200 rounded-full shadow-lg px-3 py-1.5">
+        <span className="text-[10px] text-gray-400 font-medium mr-0.5">Show</span>
+        {DATA_SIZES.map(size => (
+          <button
+            key={size}
+            type="button"
+            onClick={() => { setDataCount(size); setCurrentPage(1); }}
+            className={`px-2.5 py-1 text-xs font-bold rounded-full transition-all ${
+              dataCount === size
+                ? "bg-brand-primary text-white shadow-sm"
+                : "text-gray-500 hover:text-gray-700 hover:bg-gray-100"
+            }`}
+          >
+            {size}
+          </button>
+        ))}
+      </div>
 
     </div>
   );
