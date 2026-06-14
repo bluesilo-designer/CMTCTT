@@ -5,7 +5,7 @@ import { Pagination } from "@/components/ui/Pagination";
 import { TableCustom } from "@/components/table";
 import { InputCustom } from "@/components/input";
 import { trainingResults } from "@/data/mock";
-import type { TrainingResult } from "@/data/mock";
+import type { TrainingResult, TrainingPlatform } from "@/data/mock";
 import { cn } from "@/lib/utils";
 
 import type { FilterState } from "./types";
@@ -14,9 +14,10 @@ import { FilterPanel } from "./components/FilterPanel";
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-// ── Main page ─────────────────────────────────────────────────────────────────
+const PLATFORM_TABS: TrainingPlatform[] = ["SWT", "CMT", "CMT CTT"];
 
 export function TrainingResults({ onNavigate }: { onNavigate?: (path: string) => void }) {
+  const [activePlatform, setActivePlatform] = useState<TrainingPlatform>("SWT");
   const [currentPage, setCurrentPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -55,8 +56,16 @@ export function TrainingResults({ onNavigate }: { onNavigate?: (path: string) =>
 
   const activeFilterCount = Object.values(appliedFilters).flat().length;
 
+  const platformCounts = useMemo(() =>
+    PLATFORM_TABS.reduce((acc, p) => {
+      acc[p] = trainingResults.filter(r => r.platform === p).length;
+      return acc;
+    }, {} as Record<TrainingPlatform, number>),
+  []);
+
   const filtered = useMemo(() => {
     let result = trainingResults.filter((r) => {
+      if (r.platform !== activePlatform) return false;
       if (searchQuery) {
         const q = searchQuery.toLowerCase();
         if (!r.program.toLowerCase().includes(q) && !r.bookingId.toLowerCase().includes(q))
@@ -72,7 +81,7 @@ export function TrainingResults({ onNavigate }: { onNavigate?: (path: string) =>
     );
 
     return result;
-  }, [searchQuery, sortDir, appliedFilters]);
+  }, [searchQuery, sortDir, appliedFilters, activePlatform]);
 
   const paginated = filtered.slice((currentPage - 1) * PER_PAGE, currentPage * PER_PAGE);
 
@@ -202,10 +211,38 @@ export function TrainingResults({ onNavigate }: { onNavigate?: (path: string) =>
   return (
     <div className="flex-1 overflow-auto bg-gray-50">
       <div className="p-6">
+
+        {/* Platform tabs */}
+        <div className="flex items-center gap-0.5 bg-gray-100 rounded-xl p-1 mb-5 self-start w-fit">
+          {PLATFORM_TABS.map((tab) => (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => { setActivePlatform(tab); setCurrentPage(1); setSearchQuery(""); }}
+              className={cn(
+                "flex items-center gap-2 px-4 py-1.5 rounded-lg text-sm font-medium transition-all",
+                activePlatform === tab
+                  ? "bg-white shadow-sm text-gray-800"
+                  : "text-gray-500 hover:text-gray-700"
+              )}
+            >
+              {tab}
+              <span className={cn(
+                "inline-flex items-center justify-center min-w-[20px] h-5 px-1.5 rounded-full text-[11px] font-semibold",
+                activePlatform === tab
+                  ? "bg-brand-primary text-white"
+                  : "bg-gray-200 text-gray-500"
+              )}>
+                {platformCounts[tab]}
+              </span>
+            </button>
+          ))}
+        </div>
+
         {/* Toolbar */}
         <div className="flex items-center justify-between mb-4">
-          <span className="text-sm text-gray-500">
-            <span className="font-semibold text-gray-700">{filtered.length}</span> results
+          <span className="text-sm font-semibold text-gray-700">
+            {activePlatform} Results ({filtered.length} records)
           </span>
           <div className="flex items-center gap-2">
             {/* Search */}

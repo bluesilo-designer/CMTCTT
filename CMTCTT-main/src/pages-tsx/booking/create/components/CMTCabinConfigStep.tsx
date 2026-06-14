@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useMemo, useCallback } from "react";
-import { Check, ChevronDown, Plus, X } from "lucide-react";
+import { Check, ChevronDown, Clock, Plus, X } from "lucide-react";
 import { createColumnHelper, type ColumnDef } from "@tanstack/react-table";
 import { TableCustom } from "@/components/table";
 import { cn } from "@/lib/utils";
@@ -29,7 +29,7 @@ export interface IosEntry {
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const WEAPON_VARIANT_OPTIONS = ["40AGL", "50HMG", "7.62 COAX", "Smoke Discharger"];
-const ROLE_OPTIONS           = ["VO", "VC", "TS/TC", "SC", "SO"];
+const ROLE_OPTIONS           = ["VO", "VC", "TC", "SC", "SO"];
 
 // CMT-only IOS devices. CTT IOS devices (CTTIOS01, CTTIOS02) are reserved for
 // the CMT+CTT flow and should not appear in standalone CMT bookings.
@@ -42,7 +42,8 @@ export const CMTCTT_IOS_OPTIONS = [
   "CMTIOS01", "CMTIOS02", "CMTIOS03", "CMTIOS04",
   "CTTIOS01", "CTTIOS02",
 ];
-const BASE_STATION_OPTIONS = ["BMS1ForceSide", "BMS2ForceSide"];
+const BASE_STATION_OPTIONS                        = ["BMS1ForceSide"];
+export const BASE_STATION_OPTIONS_CTT             = ["BMS1ForceSide", "BMS2ForceSide"];
 const FORCE_TYPE_OPTIONS   = ["Opposing", "Friendly"];
 
 const CALL_SIGN_OPTIONS = [
@@ -137,8 +138,8 @@ function TableDropdown({
 }
 
 /** Multi-select dropdown for Role column — stores comma-separated values in role: string */
-function MultiRoleDropdown({ value, onChange }: {
-  value: string; onChange: (v: string) => void;
+function MultiRoleDropdown({ value, onChange, options = ROLE_OPTIONS }: {
+  value: string; onChange: (v: string) => void; options?: string[];
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -152,10 +153,10 @@ function MultiRoleDropdown({ value, onChange }: {
   }, []);
 
   const selected   = value ? value.split(",").filter(Boolean) : [];
-  const allChecked = ROLE_OPTIONS.every(r => selected.includes(r));
+  const allChecked = options.every(r => selected.includes(r));
   const someChecked = selected.length > 0 && !allChecked;
 
-  const toggleAll = () => onChange(allChecked ? "" : ROLE_OPTIONS.join(","));
+  const toggleAll = () => onChange(allChecked ? "" : options.join(","));
 
   const toggleRole = (role: string) => {
     const next = selected.includes(role)
@@ -201,7 +202,7 @@ function MultiRoleDropdown({ value, onChange }: {
           <div className="h-px bg-gray-100 mx-2 my-0.5" />
 
           {/* Core roles */}
-          {ROLE_OPTIONS.map(role => {
+          {options.map(role => {
             const checked = selected.includes(role);
             return (
               <button
@@ -364,7 +365,11 @@ export function CMTCabinConfigStep({
   showCallSign = true,
   onIOSChange,
   onCabinsChange,
+  onUserEdit,
   gridCols = "grid-cols-[60%_40%]",
+  roleOptions: roleOptionsProp,
+  baseStationOptions: baseStationOptionsProp,
+  lastUpdated,
 }: {
   bookingDetails?:       CMTBookingDetailsValues | null;
   /** Overrides the default weapon variant list in the cabin table (e.g. for CMT+CTT with qty labels) */
@@ -379,9 +384,22 @@ export function CMTCabinConfigStep({
   onIOSChange?:          (list: IosEntry[]) => void;
   /** Called whenever the cabin list changes — used to bubble state up to parent */
   onCabinsChange?:       (cabins: CabinRow[]) => void;
+  /** Called only when the user explicitly edits a cabin/IOS field (never on mount) */
+  onUserEdit?:           () => void;
   /** Tailwind grid-cols class for the table/IOS panel split. Default: "grid-cols-[60%_40%]" (60/40) */
   gridCols?:             string;
+  /** Override the role options shown in the cabin table. Defaults to ROLE_OPTIONS (VO/VC/TC/SC/SO).
+   *  For CTT bookings pass ["VO", "VC", "TC", "SO"] to exclude SC. */
+  roleOptions?:          string[];
+  /** Override the base station options in the IOS panel. Defaults to ["BMS1ForceSide"] (CMT only).
+   *  For CMT+CTT pass BASE_STATION_OPTIONS_CTT to include BMS2ForceSide. */
+  baseStationOptions?:   string[];
+  /** Last updated timestamp string displayed in the section header (e.g. "17 Jan 2025 09:29 AM") */
+  lastUpdated?:          string;
 }) {
+  const activeRoleOptions        = roleOptionsProp        ?? ROLE_OPTIONS;
+  const activeBaseStationOptions = baseStationOptionsProp ?? BASE_STATION_OPTIONS;
+
   const defaultIosList: IosEntry[] = [
     { uid: 1, iosDevice: "", baseStation: "", masterIOS: "", forceType: "" },
   ];
@@ -404,19 +422,46 @@ export function CMTCabinConfigStep({
   /** uid of the IOS entry currently open in form-edit mode (null = all collapsed) */
   const [editingUid, setEditingUid]   = useState<number | null>(initialIosListProp ? null : 1);
 
-  // Bubble IOS list up to parent whenever it changes
+  // Bubble IOS list up to parent whenever it changes (used by create-booking flow)
   const onIOSChangeRef = useRef(onIOSChange);
   onIOSChangeRef.current = onIOSChange;
+  const prevIosRef = useRef<IosEntry[] | null>(null);
   useEffect(() => {
+    if (prevIosRef.current === null || prevIosRef.current === iosList) {
+      prevIosRef.current = iosList;
+      return;
+    }
+    prevIosRef.current = iosList;
     onIOSChangeRef.current?.(iosList);
   }, [iosList]);
 
-  // Bubble cabin list up to parent whenever it changes
+  // Bubble cabin list up to parent whenever it changes (used by create-booking flow)
   const onCabinsChangeRef = useRef(onCabinsChange);
   onCabinsChangeRef.current = onCabinsChange;
+  const prevCabinsRef = useRef<CabinRow[] | null>(null);
   useEffect(() => {
+    if (prevCabinsRef.current === null || prevCabinsRef.current === cabins) {
+      prevCabinsRef.current = cabins;
+      return;
+    }
+    prevCabinsRef.current = cabins;
     onCabinsChangeRef.current?.(cabins);
   }, [cabins]);
+
+  // Guard: canEditRef is false until after the first paint + effect flush.
+  // This blocks any accidental call during the React StrictMode mount → cleanup → remount cycle.
+  const canEditRef = useRef(false);
+  useEffect(() => {
+    canEditRef.current = true;
+    return () => { canEditRef.current = false; };
+  }, []);
+
+  // onUserEdit fires ONLY from explicit user interactions — never on mount
+  const onUserEditRef = useRef(onUserEdit);
+  onUserEditRef.current = onUserEdit;
+  const notifyUserEdit = useCallback(() => {
+    if (canEditRef.current) onUserEditRef.current?.();
+  }, []);
 
   // ── Derive Platform Type options from booking details ─────────────────────────
   // Only show variants the user actually selected in Booking Details step
@@ -463,10 +508,8 @@ export function CMTCabinConfigStep({
   // ── Cabin state setters ─────────────────────────────────────────────────────
   const toggleAll = useCallback(() => {
     if (allSelected) {
-      // Deselect all
       setCabins(prev => prev.map(c => c.occupied ? c : { ...c, selected: false }));
     } else {
-      // Select up to maxCabins in order
       let count = 0;
       setCabins(prev => prev.map(c => {
         if (c.occupied) return c;
@@ -475,44 +518,54 @@ export function CMTCabinConfigStep({
         return { ...c, selected: sel };
       }));
     }
-  }, [allSelected, maxCabins]);
+    notifyUserEdit();
+  }, [allSelected, maxCabins, notifyUserEdit]);
 
   const toggleCabin = useCallback((id: string) => {
+    let changed = false;
     setCabins(prev => {
       const cabin = prev.find(c => c.id === id);
       if (!cabin || cabin.occupied) return prev;
-      // Block selecting a new cabin if already at the limit
       if (!cabin.selected && prev.filter(c => !c.occupied && c.selected).length >= maxCabins) return prev;
+      changed = true;
       return prev.map(c => c.id === id ? { ...c, selected: !c.selected } : c);
     });
-  }, [maxCabins]);
+    if (changed) notifyUserEdit();
+  }, [maxCabins, notifyUserEdit]);
 
   const setCallSign = useCallback((id: string, callSign: string) => {
     setCabins(prev => prev.map(c => c.id === id ? { ...c, callSign } : c));
-  }, []);
+    notifyUserEdit();
+  }, [notifyUserEdit]);
 
   const setWeaponVariant = useCallback((id: string, variant: string) => {
     setCabins(prev => prev.map(c => c.id === id ? { ...c, weaponVariant: variant } : c));
-  }, []);
+    notifyUserEdit();
+  }, [notifyUserEdit]);
 
   const setRole = useCallback((id: string, role: string) => {
     setCabins(prev => prev.map(c => c.id === id ? { ...c, role } : c));
-  }, []);
+    notifyUserEdit();
+  }, [notifyUserEdit]);
 
   // ── IOS list helpers ────────────────────────────────────────────────────────
   const addIOS = () => {
     const newUid = Date.now();
     setIosList(prev => [...prev, { uid: newUid, iosDevice: "", baseStation: "", masterIOS: "", forceType: "" }]);
     setEditingUid(newUid);
+    notifyUserEdit();
   };
 
   const removeIOS = (uid: number) => {
     setIosList(prev => prev.filter(e => e.uid !== uid));
     setEditingUid(prev => prev === uid ? null : prev);
+    notifyUserEdit();
   };
 
-  const updateIOS = (uid: number, field: keyof Omit<IosEntry, "uid">, value: string) =>
+  const updateIOS = (uid: number, field: keyof Omit<IosEntry, "uid">, value: string) => {
     setIosList(prev => prev.map(e => e.uid === uid ? { ...e, [field]: value } : e));
+    notifyUserEdit();
+  };
 
   // ── Table columns ───────────────────────────────────────────────────────────
   const columns = useMemo<(ColumnDef<CabinRow, any> & { minWidth?: string; maxWidth?: string; width?: string })[]>(() => {
@@ -573,7 +626,7 @@ export function CMTCabinConfigStep({
       cell:   ({ row }) => (
         <span className={cn(
           "text-sm font-medium",
-          row.original.occupied ? "text-gray-400" :
+          row.original.occupied || row.original.unavailable ? "text-gray-400" :
           row.original.selected ? "text-gray-800"  : "text-gray-600"
         )}>
           {row.original.id}
@@ -587,7 +640,7 @@ export function CMTCabinConfigStep({
       cell:   ({ row }) => row.original.occupied ? (
         <span className="text-sm text-gray-400 italic">Occupied</span>
       ) : row.original.unavailable ? (
-        <span className="text-sm text-amber-600 italic font-medium">Unavailable</span>
+        <span className="text-sm text-gray-400 italic">Unavailable</span>
       ) : (
         <TableDropdown
           value={row.original.weaponVariant}
@@ -605,6 +658,7 @@ export function CMTCabinConfigStep({
         <MultiRoleDropdown
           value={row.original.role}
           onChange={(v) => setRole(row.original.id, v)}
+          options={activeRoleOptions}
         />
       ),
     }),
@@ -625,20 +679,26 @@ export function CMTCabinConfigStep({
     return showCallSign
       ? all
       : all.filter(col => (col as any).id !== "callSign");
-  }, [allSelected, someSelected, toggleAll, toggleCabin, setCallSign, setWeaponVariant, setRole, platformTypeOptions, availableVariantOptions, showCallSign]);
+  }, [allSelected, someSelected, toggleAll, toggleCabin, setCallSign, setWeaponVariant, setRole, platformTypeOptions, availableVariantOptions, showCallSign, activeRoleOptions]);
 
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <div className="flex-1 overflow-auto bg-gray-50 p-6">
       {/* Page header */}
       <div className="mb-5">
-        <div className="flex items-center gap-3 mb-3">
+        <div className="flex items-center justify-between gap-3 mb-3">
           <h2 className="text-base font-semibold text-gray-800">
             Cabin Configuration{" "}
             <span className="font-normal text-gray-500 text-sm">
               ({selectedCount}/{maxCabins} cabin{maxCabins !== 1 ? "s" : ""} selected)
             </span>
           </h2>
+          {lastUpdated && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-400">
+              <Clock size={12} className="flex-shrink-0" />
+              <span>Last updated: <span className="text-gray-600 font-medium">{lastUpdated}</span></span>
+            </div>
+          )}
         </div>
 
         {/* Platform type quota bar — only shown when quota is defined from Booking Details */}
@@ -685,13 +745,7 @@ export function CMTCabinConfigStep({
             actionSticky={false}
             classTheadTh="!px-4 !py-3 !text-xs"
             classTBodyTd="!px-4 !py-2.5 !h-auto"
-            getRowClass={(row) =>
-              row.unavailable
-                ? "bg-amber-50/60"
-                : row.selected
-                  ? "bg-red-50"
-                  : ""
-            }
+            getRowClass={() => ""}
           />
         </div>
 
@@ -797,7 +851,7 @@ export function CMTCabinConfigStep({
                     <PanelDropdown
                       value={entry.baseStation}
                       onChange={(v) => updateIOS(entry.uid, "baseStation", v)}
-                      options={BASE_STATION_OPTIONS}
+                      options={activeBaseStationOptions}
                       placeholder="Choose base station"
                     />
                   </div>
@@ -851,14 +905,6 @@ export function CMTCabinConfigStep({
                   </div>
                 </div>
 
-                {/* Save button */}
-                <button
-                  type="button"
-                  onClick={() => setEditingUid(null)}
-                  className="w-full py-2 text-xs font-semibold bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover transition-colors"
-                >
-                  Save IOS {idx + 1}
-                </button>
               </div>
             );
           })}

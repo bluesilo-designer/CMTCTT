@@ -3,6 +3,9 @@ import { overallOf } from "./utils";
 
 export const LAST_UPDATE = "29 Apr 2026 09:24:54 PM";
 
+export type PlatformTab = "CMT" | "CMT CTT" | "SWT";
+export const PLATFORM_TABS: PlatformTab[] = ["CMT", "CMT CTT", "SWT"];
+
 export const BIT_TRMS_SECTIONS: SectionData[] = [
   {
     id: "trms-network", title: "Network", infoTitle: "Network Information", overallStatus: "Failed",
@@ -55,6 +58,86 @@ export const BIT_IMT_ITEMS: CheckItem[] = [
   { label: "Projector",         status: "Shutting Down", info: { description: "Room projector",           errorMessage: "Lamp thermal shutdown initiated" } },
   { label: "Sound Card",        status: "Not Found",     info: { description: "Audio device",             errorMessage: "Device not detected" } },
   { label: "System Memory",     status: "Low",           info: { description: "RAM",                      errorMessage: "Available memory below threshold (2 GB)" } },
+];
+
+// ── Platform-specific hardware: CMT ───────────────────────────────────────────
+
+export const BIT_CMT_CABINS: CheckItem[] = [
+  { label: "CMT01", status: "Running",   info: { description: "CMT Cabin 01", errorMessage: "" } },
+  { label: "CMT02", status: "Running",   info: { description: "CMT Cabin 02", errorMessage: "" } },
+  { label: "CMT03", status: "Unknown",   info: { description: "CMT Cabin 03", errorMessage: "Hardware self-test not responding" } },
+  { label: "CMT04", status: "Running",   info: { description: "CMT Cabin 04", errorMessage: "" } },
+  { label: "CMT05", status: "Running",   info: { description: "CMT Cabin 05", errorMessage: "" } },
+  { label: "CMT06", status: "Not Running", info: { description: "CMT Cabin 06", errorMessage: "Display subsystem offline" } },
+  { label: "CMT07", status: "Running",   info: { description: "CMT Cabin 07", errorMessage: "" } },
+  { label: "CMT08", status: "Running",   info: { description: "CMT Cabin 08", errorMessage: "" } },
+  { label: "CMT09", status: "Unknown",   info: { description: "CMT Cabin 09 (Maintenance)", errorMessage: "Under scheduled maintenance" } },
+  { label: "CMT10", status: "Running",   info: { description: "CMT Cabin 10", errorMessage: "" } },
+  { label: "CMT11", status: "Running",   info: { description: "CMT Cabin 11", errorMessage: "" } },
+  { label: "CMT12", status: "Running",   info: { description: "CMT Cabin 12", errorMessage: "" } },
+];
+
+export const BIT_CMT_IOS: CheckItem[] = [
+  { label: "CMTIOS01", status: "Running", info: { description: "IOS Station 01", errorMessage: "" } },
+  { label: "CMTIOS02", status: "Running", info: { description: "IOS Station 02", errorMessage: "" } },
+  { label: "CMTIOS03", status: "Unknown", info: { description: "IOS Station 03", errorMessage: "Network handshake failed" } },
+  { label: "CMTIOS04", status: "Running", info: { description: "IOS Station 04", errorMessage: "" } },
+];
+
+export const BIT_CMT_NETWORK: CheckItem[] = [
+  { label: "BMS1ForceSide", status: "Running", info: { description: "Base Station 1 — Force Side", errorMessage: "" } },
+  { label: "BMS2ForceSide", status: "Running", info: { description: "Base Station 2 — Force Side", errorMessage: "" } },
+  { label: "Scenario Server", status: "Running", info: { description: "Mission scenario server", errorMessage: "" } },
+  { label: "After Action Review", status: "Unknown", info: { description: "AAR playback server", errorMessage: "Disk I/O timeout" } },
+];
+
+// ── Platform-specific hardware: CTT ───────────────────────────────────────────
+
+export const BIT_CTT_CLUSTERS: CheckItem[] = [
+  { label: "CTT01", status: "Running", info: { description: "CTT Cluster 01 (6 seats)", errorMessage: "" } },
+  { label: "CTT02", status: "Running", info: { description: "CTT Cluster 02 (6 seats)", errorMessage: "" } },
+  { label: "CTT03", status: "Unknown", info: { description: "CTT Cluster 03 (6 seats)", errorMessage: "Seat 4 display not detected" } },
+  { label: "CTT04", status: "Running", info: { description: "CTT Cluster 04 (6 seats)", errorMessage: "" } },
+];
+
+export const BIT_CTT_IOS: CheckItem[] = [
+  { label: "CTTIOS01", status: "Running", info: { description: "CTT IOS Station 01", errorMessage: "" } },
+  { label: "CTTIOS02", status: "Running", info: { description: "CTT IOS Station 02", errorMessage: "" } },
+];
+
+export const BIT_CTT_NETWORK: CheckItem[] = [
+  { label: "CTT Base Station",    status: "Running", info: { description: "CTT network hub", errorMessage: "" } },
+  { label: "Instructor Console",  status: "Running", info: { description: "Master instructor console", errorMessage: "" } },
+  { label: "Content Server",      status: "Ok",      info: { description: "Training content repository", errorMessage: "" } },
+];
+
+// ── Platform-specific hardware: SWT ───────────────────────────────────────────
+
+export const BIT_SWT_STATIONS: CheckItem[] = [
+  { label: "SWT Station 01", status: "Running",    info: { description: "Weapon station 01", errorMessage: "" } },
+  { label: "SWT Station 02", status: "Running",    info: { description: "Weapon station 02", errorMessage: "" } },
+  { label: "SWT Station 03", status: "Unknown",    info: { description: "Weapon station 03", errorMessage: "Trigger sensor calibration needed" } },
+  { label: "SWT Station 04", status: "Running",    info: { description: "Weapon station 04", errorMessage: "" } },
+  { label: "SWT Station 05", status: "Running",    info: { description: "Weapon station 05", errorMessage: "" } },
+  { label: "SWT Station 06", status: "Not Running",info: { description: "Weapon station 06", errorMessage: "Power supply fault" } },
+  { label: "SWT Station 07", status: "Running",    info: { description: "Weapon station 07", errorMessage: "" } },
+  { label: "SWT Station 08", status: "Running",    info: { description: "Weapon station 08", errorMessage: "" } },
+];
+
+export const BIT_SWT_RFID: CheckItem[] = [
+  { label: "RFID Reader 01",  status: "Running", info: { description: "RFID reader at armoury gate",   errorMessage: "" } },
+  { label: "RFID Reader 02",  status: "Running", info: { description: "RFID reader at lane entry",     errorMessage: "" } },
+  { label: "RFID Reader 03",  status: "Failed",  info: { description: "RFID reader at lane exit",      errorMessage: "Antenna 03 connection timed out" } },
+  { label: "RFID Antenna 01", status: "Running", info: { description: "Gate antenna 01",               errorMessage: "" } },
+  { label: "RFID Antenna 02", status: "Running", info: { description: "Gate antenna 02",               errorMessage: "" } },
+  { label: "RFID Antenna 03", status: "Failed",  info: { description: "Gate antenna 03",               errorMessage: "No response from unit" } },
+];
+
+export const BIT_SWT_NETWORK: CheckItem[] = [
+  { label: "SWT-01 Base Station", status: "Running", info: { description: "SWT primary network node", errorMessage: "" } },
+  { label: "SWT-02 Base Station", status: "Running", info: { description: "SWT secondary network node", errorMessage: "" } },
+  { label: "Range Control Server", status: "Running", info: { description: "Range management server", errorMessage: "" } },
+  { label: "Scoring Server",       status: "Unknown", info: { description: "Live scoring processor", errorMessage: "High latency detected (>200ms)" } },
 ];
 
 export const HUMS_ITEMS: CheckItem[] = [

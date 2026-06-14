@@ -314,6 +314,36 @@ const MONTH_NAMES = [
 ];
 const DAY_NAMES = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
+// Mock already-booked dates — stored as "YYYY-M-D" strings (month is 0-indexed)
+const BOOKED_DATES: Record<string, Set<string>> = {
+  "AM/PM": new Set([
+    "2025-0-7",  "2025-0-8",
+    "2025-0-14", "2025-0-15",
+    "2025-0-21",
+    "2025-1-4",  "2025-1-5",
+    "2025-1-11", "2025-1-12",
+    "2025-1-18", "2025-1-19",
+    "2025-2-5",  "2025-2-6",
+    "2025-2-12", "2025-2-19",
+  ]),
+  "Full Day": new Set([
+    "2025-0-10", "2025-0-17", "2025-0-24",
+    "2025-1-7",  "2025-1-14", "2025-1-21",
+    "2025-2-3",  "2025-2-10", "2025-2-17",
+  ]),
+  "Ad-hoc": new Set([
+    "2025-1-5",  "2025-1-6",
+    "2025-1-12", "2025-1-19",
+    "2025-2-5",  "2025-2-6",
+    "2025-2-12", "2025-2-19",
+  ]),
+};
+
+function isBooked(year: number, month: number, day: number, scheduleType: string | null) {
+  if (!scheduleType) return false;
+  return BOOKED_DATES[scheduleType]?.has(`${year}-${month}-${day}`) ?? false;
+}
+
 function getDaysInMonth(y: number, m: number) { return new Date(y, m + 1, 0).getDate(); }
 function getFirstDay(y: number, m: number)    { return new Date(y, m, 1).getDay(); }
 
@@ -324,8 +354,9 @@ function isSameDay(a: Date | null, b: Date) {
     && a.getDate()     === b.getDate();
 }
 
-function MonthView({ year, month, selected, onSelect }: {
+function MonthView({ year, month, selected, onSelect, scheduleType }: {
   year: number; month: number; selected: Date | null; onSelect: (d: Date) => void;
+  scheduleType: string | null;
 }) {
   const days  = getDaysInMonth(year, month);
   const start = getFirstDay(year, month);
@@ -345,16 +376,21 @@ function MonthView({ year, month, selected, onSelect }: {
       <div className="grid grid-cols-7 gap-y-0.5">
         {cells.map((day, idx) => {
           if (!day) return <div key={`e-${idx}`} />;
-          const date   = new Date(year, month, day);
-          const active = isSameDay(selected, date);
+          const date    = new Date(year, month, day);
+          const active  = isSameDay(selected, date);
+          const booked  = isBooked(year, month, day, scheduleType);
           return (
             <button
               key={day}
               type="button"
-              onClick={() => onSelect(date)}
+              disabled={booked}
+              title={booked ? "Already booked" : undefined}
+              onClick={() => { if (!booked) onSelect(date); }}
               className={cn(
                 "mx-auto w-7 h-7 rounded-full text-xs flex items-center justify-center transition-colors",
-                active ? "bg-brand-primary text-white font-semibold" : "text-gray-500 hover:bg-gray-100"
+                booked  ? "text-gray-300 line-through cursor-not-allowed bg-gray-100" :
+                active  ? "bg-brand-primary text-white font-semibold" :
+                          "text-gray-500 hover:bg-gray-100"
               )}
             >
               {day}
@@ -768,9 +804,9 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                       <ChevronLeft size={15} />
                     </button>
                     <div className="flex-1 flex gap-4 min-w-0">
-                      <MonthView year={calYear} month={calMonth} selected={selectedDate} onSelect={setSelectedDate} />
+                      <MonthView year={calYear} month={calMonth} selected={selectedDate} onSelect={setSelectedDate} scheduleType={values.scheduleType} />
                       <div className="w-px bg-gray-100 flex-shrink-0 self-stretch" />
-                      <MonthView year={year2}   month={month2}   selected={selectedDate} onSelect={setSelectedDate} />
+                      <MonthView year={year2}   month={month2}   selected={selectedDate} onSelect={setSelectedDate} scheduleType={values.scheduleType} />
                     </div>
                     <button type="button" onClick={nextMonth}
                       className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0 mt-1">

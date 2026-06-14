@@ -115,6 +115,9 @@ export function BookingDetail() {
   const [nominalRollChanged,  setNominalRollChanged]  = useState(false);
   const [cabinConfigChanged,  setCabinConfigChanged]   = useState(false);
   const [showSyncConfirm,     setShowSyncConfirm]      = useState(false);
+  const [showSyncApproval,    setShowSyncApproval]     = useState(false);
+  // True once the user explicitly confirms Sync — hides Sync, shows Start Onboarding
+  const [isSynced,            setIsSynced]             = useState(false);
   const [cmtcttActiveTab, setCmtcttActiveTab] = useState("Booking Details");
   const dotMenuRef = useRef<HTMLDivElement>(null);
   const setBooking = useBookingStore((s) => s.setBooking);
@@ -155,8 +158,8 @@ export function BookingDetail() {
     time: selectedBooking.bookingTime,
     program: selectedBooking.program,
     trainingMode: selectedBooking.trainingMode,
-    briefingRoom: "Briefing Room",
-    sectionType: "Standalone",
+    briefingRoom: "Briefing Room A",
+    sectionType: (selectedBooking.isCMT || selectedBooking.isCMTCTT) ? "Compartment Selection" : (selectedBooking.sectionType ?? "Standalone"),
     courseware: selectedBooking.courseware,
     traineesCount: selectedBooking.trainees ?? 32,
     trainingType: selectedBooking.trainingType,
@@ -284,7 +287,7 @@ export function BookingDetail() {
                 const hasChanges = nominalRollChanged || cabinConfigChanged;
 
                 return hasChanges ? (
-                  /* Data changed → show Confirm + Cancel */
+                  /* Data changed → show Cancel + Confirm */
                   <>
                     <button
                       type="button"
@@ -301,18 +304,21 @@ export function BookingDetail() {
                     </Button>
                   </>
                 ) : (
-                  /* No changes → show Sync */
-                  <Button
-                    type="outline"
-                    className="px-5 py-2.5 text-sm font-semibold w-auto border border-gray-300 text-gray-700"
-                  >
-                    Sync
-                  </Button>
+                  /* No changes → show Sync (hidden once synced) */
+                  !isSynced && (
+                    <Button
+                      type="outline"
+                      onClick={() => setShowSyncApproval(true)}
+                      className="px-5 py-2.5 text-sm font-semibold w-auto border border-gray-300 text-gray-700"
+                    >
+                      Sync
+                    </Button>
+                  )
                 );
               })()}
 
-              {/* Start Onboarding for standalone CMT — only when Ongoing (not Upcoming) */}
-              {BOOKING.isCMT && !isCMTCTT && cmtDetailListGenerated && BOOKING.status === "Ongoing" && (
+              {/* Start Onboarding — appears after user explicitly clicks Sync */}
+              {BOOKING.isCMT && !isCMTCTT && isSynced && !(nominalRollChanged || cabinConfigChanged) && (
                 <Button
                   onClick={() => setShowOnboarding(true)}
                   className="px-5 py-2.5 text-sm font-semibold w-auto bg-brand-primary text-white hover:bg-brand-primary-hover"
@@ -499,7 +505,10 @@ export function BookingDetail() {
           )}
 
           {/* Tab: Booking Details */}
-          {!isCMTCTT && activeTab === "Booking Details" && (
+          {!isCMTCTT && activeTab === "Booking Details" && (() => {
+            const sessionLabel = BOOKING.time?.match(/\(([^)]+)\)/)?.[1] ?? "—";
+            const platformTypes = selectedBooking?.weapon ?? "—";
+            return (
             <div className="space-y-5">
               <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
                 <h2 className="text-sm font-bold text-gray-700 mb-5">Training Information</h2>
@@ -531,50 +540,74 @@ export function BookingDetail() {
                   <Field label="Schedule Type" value="Fixed Schedule" />
                   <Field label="Training Date" value={BOOKING.date} />
                   <Field label="Training Time" value={BOOKING.time} />
-                  <Field label="Session Type" value="Full Day" />
+                  <Field label="Session Type" value={sessionLabel} />
                 </dl>
               </div>
 
-              <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-                <h2 className="text-sm font-bold text-gray-700 mb-4">
-                  Weapon List ({BOOKING.weapons.reduce((a, w) => a + w.units, 0)} Units)
-                </h2>
-                <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
-                  {BOOKING.weapons.map((w: any) => (
-                    <div key={w.type}>
-                      <dt className="text-xs text-gray-400 mb-0.5">Weapon Type</dt>
-                      <dd className="text-sm font-semibold text-gray-800">{w.type} ({w.units} Units)</dd>
+              {BOOKING.isCMT ? (
+                <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+                  <h2 className="text-sm font-bold text-gray-700 mb-5">Platform Configuration</h2>
+                  <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
+                    <Field label="Booking Type" value="Compartment Selection" />
+                    <Field label="Vehicle Type" value="ICV (TERREX)" />
+                    <div>
+                      <dt className="text-xs text-gray-400 mb-1">Platform Type</dt>
+                      <dd className="flex flex-wrap gap-1.5">
+                        {platformTypes.split(",").map((p: string) => (
+                          <span key={p.trim()} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                            {p.trim()}
+                          </span>
+                        ))}
+                      </dd>
                     </div>
-                  ))}
-                </dl>
-              </div>
+                    <Field label="Base Station" value="BMS1ForceSide" />
+                  </dl>
+                </div>
+              ) : (
+                <>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+                    <h2 className="text-sm font-bold text-gray-700 mb-4">
+                      Weapon List ({BOOKING.weapons.reduce((a, w) => a + w.units, 0)} Units)
+                    </h2>
+                    <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-4">
+                      {BOOKING.weapons.map((w: any) => (
+                        <div key={w.type}>
+                          <dt className="text-xs text-gray-400 mb-0.5">Weapon Type</dt>
+                          <dd className="text-sm font-semibold text-gray-800">{w.type} ({w.units} Units)</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h2 className="text-sm font-bold text-gray-700 mb-4">Base Station ({BOOKING.baseStations.length} Stations)</h2>
-                  <dl className="space-y-3">
-                    {BOOKING.baseStations.map((s: any, i: any) => (
-                      <div key={i}>
-                        <dt className="text-xs text-gray-400 mb-0.5">{s.label}</dt>
-                        <dd className="text-sm font-semibold text-gray-800">{s.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-                <div className="bg-white rounded-xl border border-gray-200 p-6">
-                  <h2 className="text-sm font-bold text-gray-700 mb-4">C-Shaped Station ({BOOKING.cShapedStations.length} Stations)</h2>
-                  <dl className="space-y-3">
-                    {BOOKING.cShapedStations.map((s: any, i: any) => (
-                      <div key={i}>
-                        <dt className="text-xs text-gray-400 mb-0.5">{s.label}</dt>
-                        <dd className="text-sm font-semibold text-gray-800">{s.value}</dd>
-                      </div>
-                    ))}
-                  </dl>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                    <div className="bg-white rounded-xl border border-gray-200 p-6">
+                      <h2 className="text-sm font-bold text-gray-700 mb-4">Base Station ({BOOKING.baseStations.length} Stations)</h2>
+                      <dl className="space-y-3">
+                        {BOOKING.baseStations.map((s: any, i: any) => (
+                          <div key={i}>
+                            <dt className="text-xs text-gray-400 mb-0.5">{s.label}</dt>
+                            <dd className="text-sm font-semibold text-gray-800">{s.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                    <div className="bg-white rounded-xl border border-gray-200 p-6">
+                      <h2 className="text-sm font-bold text-gray-700 mb-4">C-Shaped Station ({BOOKING.cShapedStations.length} Stations)</h2>
+                      <dl className="space-y-3">
+                        {BOOKING.cShapedStations.map((s: any, i: any) => (
+                          <div key={i}>
+                            <dt className="text-xs text-gray-400 mb-0.5">{s.label}</dt>
+                            <dd className="text-sm font-semibold text-gray-800">{s.value}</dd>
+                          </div>
+                        ))}
+                      </dl>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
-          )}
+            );
+          })()}
 
           {/* Tab: Nominal Rolls */}
           {!isCMTCTT && activeTab === "Nominal Rolls" && (
@@ -582,7 +615,7 @@ export function BookingDetail() {
               /* CMT — use the same table as the create-booking flow */
               <CMTNominalRollDetail
                 onDataChange={() => {
-                  if (cmtDetailListGenerated) setNominalRollChanged(true);
+                  if (cmtDetailListGenerated) { setNominalRollChanged(true); setIsSynced(false); }
                 }}
               />
             ) : (
@@ -648,8 +681,9 @@ export function BookingDetail() {
                 gridCols="grid-cols-[70%_30%]"
                 initialCabins={localData?.cabins ?? DETAIL_DEMO_CABINS}
                 initialIosList={localData?.iosList}
-                onCabinsChange={() => {
-                  if (cmtDetailListGenerated) setCabinConfigChanged(true);
+                lastUpdated="17 Jan 2025 09:29 AM"
+                onUserEdit={() => {
+                  if (cmtDetailListGenerated) { setCabinConfigChanged(true); setIsSynced(false); }
                 }}
               />
             );
@@ -657,7 +691,7 @@ export function BookingDetail() {
 
           {!isCMTCTT && activeTab === "Detail List" && (
             BOOKING.isCMT
-              ? <CMTDetailListTab status={BOOKING.status} onGenerated={() => setCmtDetailListGenerated(true)} />
+              ? <CMTDetailListTab status={BOOKING.status} isGenerated={cmtDetailListGenerated} onGenerated={() => setCmtDetailListGenerated(true)} />
               : (
                 <BookingDetailListTab
                   bookingTitle={BOOKING.title}
@@ -687,7 +721,7 @@ export function BookingDetail() {
               <div>
                 <h3 className="text-base font-bold text-gray-800">Confirm Update</h3>
                 <p className="text-sm text-gray-500 mt-0.5">
-                  Are you sure you want to update? This update requires you to re-generate the Detail List.
+                  Are you sure you want to confirm these changes? The Detail List will reflect your updated data.
                 </p>
               </div>
             </div>
@@ -702,15 +736,52 @@ export function BookingDetail() {
               <button
                 type="button"
                 onClick={() => {
-                  // Reset changes and require re-generation of detail list
+                  // Confirm changes — go back to Sync state (detail list stays generated)
                   setNominalRollChanged(false);
                   setCabinConfigChanged(false);
-                  setCmtDetailListGenerated(false);
                   setShowSyncConfirm(false);
                 }}
                 className="py-2.5 text-sm font-semibold bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover transition-colors"
               >
                 Yes, Update
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Sync approval popup */}
+      {showSyncApproval && (
+        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+          <div className="bg-white rounded-2xl shadow-xl w-[440px] p-6">
+            <div className="flex items-center gap-4 mb-5">
+              <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" className="text-blue-500">
+                  <path d="M21.5 2v6h-6"/><path d="M2.5 12a9 9 0 0 1 15-6.7L21.5 8"/>
+                  <path d="M2.5 22v-6h6"/><path d="M21.5 12a9 9 0 0 1-15 6.7L2.5 16"/>
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-base font-bold text-gray-800">Confirm Sync</h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Are you sure you want to sync? This will finalise the current Detail List and enable onboarding.
+                </p>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <button
+                type="button"
+                onClick={() => setShowSyncApproval(false)}
+                className="py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsSynced(true); setShowSyncApproval(false); }}
+                className="py-2.5 text-sm font-semibold bg-brand-primary text-white rounded-lg hover:bg-brand-primary-hover transition-colors"
+              >
+                Yes, Sync
               </button>
             </div>
           </div>

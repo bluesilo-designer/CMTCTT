@@ -1,34 +1,85 @@
 import { useState } from "react";
-import { RefreshCw, Activity, CheckCircle2, AlertTriangle, Cpu, Server, Thermometer, ChevronRight } from "lucide-react";
+import { RefreshCw, Activity, CheckCircle2, AlertTriangle, Server, Thermometer, ChevronRight, MonitorPlay, Target, Layers } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/button";
 import type { Status } from "./types";
-import { BIT_TRMS_SECTIONS, BIT_IMT_ITEMS, HUMS_ITEMS, LAST_UPDATE } from "./constants";
+import type { CheckItem } from "./types";
+import {
+  BIT_TRMS_SECTIONS, BIT_IMT_ITEMS, HUMS_ITEMS, LAST_UPDATE,
+  PLATFORM_TABS, type PlatformTab,
+  BIT_CMT_CABINS, BIT_CMT_IOS, BIT_CMT_NETWORK,
+  BIT_CTT_CLUSTERS, BIT_CTT_IOS, BIT_CTT_NETWORK,
+  BIT_SWT_STATIONS, BIT_SWT_RFID, BIT_SWT_NETWORK,
+} from "./constants";
 import { isGood, isWarn, statusColor, statusDot } from "./utils";
 import { SectionCard } from "./components/SectionCard";
 import { ImtCard } from "./components/ImtCard";
 import { OverallIcon } from "./components/OverallIcon";
 import { SystemInformation } from "./components/SystemInformation";
 
+// ── Per-platform hardware groups ──────────────────────────────────────────────
+
+interface HardwareGroup {
+  label: string;
+  sectionKey: string;
+  items: CheckItem[];
+}
+
+const PLATFORM_HARDWARE: Record<PlatformTab, { groups: HardwareGroup[] }> = {
+  "CMT": {
+    groups: [
+      { label: "Cabins",        sectionKey: "bit-cmt-cabins",  items: BIT_CMT_CABINS },
+      { label: "IOS Stations",  sectionKey: "bit-cmt-ios",     items: BIT_CMT_IOS },
+      { label: "Network & Servers", sectionKey: "bit-cmt-net", items: BIT_CMT_NETWORK },
+    ],
+  },
+  "CMT CTT": {
+    groups: [
+      { label: "CMT Cabins",    sectionKey: "bit-cmt-cabins",  items: BIT_CMT_CABINS },
+      { label: "CMT IOS",       sectionKey: "bit-cmt-ios",     items: BIT_CMT_IOS },
+      { label: "CTT Clusters",  sectionKey: "bit-ctt-clusters",items: BIT_CTT_CLUSTERS },
+      { label: "CTT IOS",       sectionKey: "bit-ctt-ios",     items: BIT_CTT_IOS },
+      { label: "Network & Servers", sectionKey: "bit-ctt-net", items: [...BIT_CMT_NETWORK, ...BIT_CTT_NETWORK] },
+    ],
+  },
+  "SWT": {
+    groups: [
+      { label: "Weapon Stations", sectionKey: "bit-swt-stations", items: BIT_SWT_STATIONS },
+      { label: "RFID",            sectionKey: "bit-swt-rfid",     items: BIT_SWT_RFID },
+      { label: "Network & Servers", sectionKey: "bit-swt-net",    items: BIT_SWT_NETWORK },
+    ],
+  },
+};
+
+function platformIcon(tab: PlatformTab) {
+  if (tab === "CMT")     return <MonitorPlay size={14} className="text-gray-400" />;
+  if (tab === "CMT CTT") return <Layers size={14} className="text-gray-400" />;
+  return <Target size={14} className="text-gray-400" />;
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 export function SystemHealth() {
   const [detailSection, setDetailSection] = useState<string | null>(null);
   const [rerunning, setRerunning] = useState(false);
+  const [platformTab, setPlatformTab] = useState<PlatformTab>("CMT");
 
   if (detailSection !== null) {
     return <SystemInformation initialSection={detailSection} onBack={() => setDetailSection(null)} />;
   }
 
-  const imtCols: (typeof BIT_IMT_ITEMS)[] = [[], [], []];
-  BIT_IMT_ITEMS.forEach((item, i) => imtCols[i % 3].push(item));
+  const imtCols: CheckItem[][] = [[], [], []];
+  BIT_IMT_ITEMS.forEach((item, idx) => imtCols[idx % 3].push(item));
 
-  const humsCols: (typeof HUMS_ITEMS)[] = [[], [], []];
-  HUMS_ITEMS.forEach((item, i) => humsCols[i % 3].push(item));
+  const humsCols: CheckItem[][] = [[], [], []];
+  HUMS_ITEMS.forEach((item, idx) => humsCols[idx % 3].push(item));
 
-  // Summary stats
-  const allItems    = [...BIT_TRMS_SECTIONS.flatMap((s) => s.items), ...BIT_IMT_ITEMS, ...HUMS_ITEMS];
-  const passedCount = allItems.filter((i) => isGood(i.status)).length;
-  const failedCount = allItems.filter((i) => i.status === "Failed").length;
-  const warnCount   = allItems.filter((i) => isWarn(i.status)).length;
+  // Summary stats — include active platform hardware
+  const platformItems = PLATFORM_HARDWARE[platformTab].groups.flatMap((g) => g.items);
+  const allItems    = [...BIT_TRMS_SECTIONS.flatMap((s) => s.items), ...platformItems, ...HUMS_ITEMS];
+  const passedCount = allItems.filter((item) => isGood(item.status)).length;
+  const failedCount = allItems.filter((item) => item.status === "Failed").length;
+  const warnCount   = allItems.filter((item) => isWarn(item.status)).length;
   const overallPct  = Math.round((passedCount / allItems.length) * 100);
   const systemStatus: Status = failedCount > 0 ? "Failed" : warnCount > 0 ? "Unknown" : "Passed";
 
@@ -120,11 +171,50 @@ export function SystemHealth() {
           </div>
 
           <div className="p-5 space-y-5">
-            {/* BIT (TRMS) */}
+
+            {/* ── Platform tab selector ─────────────────────────────────── */}
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-gray-100 rounded-xl p-1 gap-0.5 w-fit">
+                {PLATFORM_TABS.map((tab) => {
+                  const active = platformTab === tab;
+                  // count issues for this tab
+                  const tabItems = PLATFORM_HARDWARE[tab].groups.flatMap((g) => g.items);
+                  const tabIssues = tabItems.filter((it) => it.status === "Failed" || isWarn(it.status)).length;
+                  return (
+                    <button
+                      key={tab}
+                      onClick={() => setPlatformTab(tab)}
+                      className={cn(
+                        "flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold transition-all focus:outline-none",
+                        active
+                          ? "bg-white text-gray-800 shadow-sm"
+                          : "text-gray-400 hover:text-gray-600 hover:bg-gray-50/80",
+                      )}
+                    >
+                      {tab}
+                      {tabIssues > 0 && (
+                        <span className={cn(
+                          "inline-flex items-center justify-center w-4 h-4 rounded-full text-[10px] font-bold",
+                          active ? "bg-red-100 text-red-600" : "bg-gray-200 text-gray-500"
+                        )}>
+                          {tabIssues}
+                        </span>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+              <span className="text-xs text-gray-400">
+                {PLATFORM_HARDWARE[platformTab].groups.flatMap((g) => g.items).length} components monitored
+              </span>
+            </div>
+
+            {/* BIT (TRMS) — shared backend checks */}
             <div>
               <div className="flex items-center gap-2 mb-3">
                 <Server size={14} className="text-gray-400" />
                 <h3 className="text-sm font-semibold text-gray-700">BIT (TRMS)</h3>
+                <span className="text-xs text-gray-400 ml-1">— Shared backend services</span>
               </div>
               <div className="flex gap-4 flex-wrap">
                 {BIT_TRMS_SECTIONS.map((section) => (
@@ -136,19 +226,37 @@ export function SystemHealth() {
             {/* Divider */}
             <div className="border-t border-gray-100" />
 
-            {/* BIT (IMT) */}
-            <div>
-              <div className="flex items-center gap-2 mb-3">
-                <Cpu size={14} className="text-gray-400" />
-                <h3 className="text-sm font-semibold text-gray-700">BIT (IMT)</h3>
-                <span className="ml-auto text-xs text-gray-400">{BIT_IMT_ITEMS.length} components</span>
-              </div>
-              <div className="flex gap-3">
-                {imtCols.map((col, ci) => (
-                  <ImtCard key={ci} items={col} onDetail={setDetailSection} />
-                ))}
-              </div>
-            </div>
+            {/* BIT (Platform hardware) — changes per tab */}
+            {PLATFORM_HARDWARE[platformTab].groups.map((group, gi) => {
+              const cols: CheckItem[][] = [[], [], []];
+              group.items.forEach((item, idx) => cols[idx % 3].push(item));
+              const issueCount = group.items.filter((it) => !isGood(it.status)).length;
+
+              return (
+                <div key={group.sectionKey}>
+                  {gi > 0 && <div className="border-t border-gray-50 mb-5" />}
+                  <div className="flex items-center gap-2 mb-3">
+                    {platformIcon(platformTab)}
+                    <h3 className="text-sm font-semibold text-gray-700">
+                      BIT ({platformTab}) — {group.label}
+                    </h3>
+                    <span className="ml-auto text-xs text-gray-400">{group.items.length} components</span>
+                    {issueCount > 0 && (
+                      <span className="text-xs font-semibold text-amber-500">
+                        {issueCount} issue{issueCount > 1 ? "s" : ""}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex gap-3">
+                    {cols.map((col, ci) =>
+                      col.length > 0 ? (
+                        <ImtCard key={ci} items={col} onDetail={setDetailSection} />
+                      ) : null
+                    )}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 

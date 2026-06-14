@@ -61,6 +61,8 @@ export interface BookingDetail {
   pax?: number;
 }
 
+export type TrainingPlatform = "SWT" | "CMT" | "CMT CTT";
+
 export interface TrainingResult {
   id: string;
   program: string;
@@ -69,6 +71,7 @@ export interface TrainingResult {
   bookingDate: string;
   trainingMode: TrainingMode;
   atmsFileId: number;
+  platform: TrainingPlatform;
 }
 
 export interface AssetMovement {
@@ -473,6 +476,7 @@ export const trainingResults: TrainingResult[] = [
     bookingDate: "22 Apr 2026\n01:00 PM - 05:00 PM (PM Session)",
     trainingMode: "Marksmanship",
     atmsFileId: 1,
+    platform: "SWT",
   },
   {
     id: "2",
@@ -482,15 +486,47 @@ export const trainingResults: TrainingResult[] = [
     bookingDate: "22, 23 Apr 2026\n01:00 PM - 05:00 PM (PM Session)",
     trainingMode: "Marksmanship",
     atmsFileId: 1,
+    platform: "SWT",
   },
   {
     id: "3",
-    program: "IMT Group Training for Unit t",
+    program: "IMT Group Training for Unit T",
     bookingId: "#260422-PTC001",
     trainingType: "Group",
     bookingDate: "22 Apr 2026\n01:00 PM - 05:00 PM (PM Session)",
     trainingMode: "Marksmanship",
     atmsFileId: 1,
+    platform: "SWT",
+  },
+  {
+    id: "4",
+    program: "CMT Group Training for Unit Alpha",
+    bookingId: "#260422-CMT001",
+    trainingType: "Group",
+    bookingDate: "23 Apr 2026\n08:00 AM - 12:00 PM (AM Session)",
+    trainingMode: "Marksmanship",
+    atmsFileId: 2,
+    platform: "CMT",
+  },
+  {
+    id: "5",
+    program: "CMT Individual Training for Unit Bravo",
+    bookingId: "#260423-CMT002",
+    trainingType: "Individual",
+    bookingDate: "24 Apr 2026\n08:00 AM - 05:00 PM (Full Day)",
+    trainingMode: "Marksmanship",
+    atmsFileId: 3,
+    platform: "CMT",
+  },
+  {
+    id: "6",
+    program: "CMT CTT Combined Training for Unit Charlie",
+    bookingId: "#260424-CTT001",
+    trainingType: "Group",
+    bookingDate: "25 Apr 2026\n01:00 PM - 05:00 PM (PM Session)",
+    trainingMode: "Marksmanship",
+    atmsFileId: 4,
+    platform: "CMT CTT",
   },
 ];
 

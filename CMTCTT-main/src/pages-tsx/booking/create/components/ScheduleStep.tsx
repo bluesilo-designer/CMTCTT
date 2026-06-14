@@ -8,6 +8,36 @@ import type { ScheduleType, ScheduleSection, ScheduleSnapshot } from "../types";
 const MONTH_NAMES = ["January","February","March","April","May","June","July","August","September","October","November","December"];
 const DOW = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
+// Mock already-booked dates per schedule type — stored as "YYYY-M-D" (month 0-indexed)
+const BOOKED_DATES: Record<string, Set<string>> = {
+  "AM/PM": new Set([
+    "2025-0-7",  "2025-0-8",
+    "2025-0-14", "2025-0-15",
+    "2025-0-21",
+    "2025-1-4",  "2025-1-5",
+    "2025-1-11", "2025-1-12",
+    "2025-1-18", "2025-1-19",
+    "2025-2-5",  "2025-2-6",
+    "2025-2-12", "2025-2-19",
+  ]),
+  "FullDay": new Set([
+    "2025-0-10", "2025-0-17", "2025-0-24",
+    "2025-1-7",  "2025-1-14", "2025-1-21",
+    "2025-2-3",  "2025-2-10", "2025-2-17",
+  ]),
+  "Ad-hoc": new Set([
+    "2025-1-5",  "2025-1-6",
+    "2025-1-12", "2025-1-19",
+    "2025-2-5",  "2025-2-6",
+    "2025-2-12", "2025-2-19",
+  ]),
+};
+
+function isBooked(year: number, month: number, day: number, scheduleType: ScheduleType) {
+  if (!scheduleType) return false;
+  return BOOKED_DATES[scheduleType]?.has(`${year}-${month}-${day}`) ?? false;
+}
+
 function buildCells(year: number, month: number) {
   const firstDay = new Date(year, month, 1).getDay();
   const daysInMonth = new Date(year, month + 1, 0).getDate();
@@ -20,12 +50,13 @@ function buildCells(year: number, month: number) {
 }
 
 function DateRangeCalendar({
-  startDate, endDate, onSelectStart, onSelectEnd,
+  startDate, endDate, onSelectStart, onSelectEnd, scheduleType,
 }: {
   startDate: Date | null;
   endDate: Date | null;
   onSelectStart: (d: Date) => void;
   onSelectEnd: (d: Date) => void;
+  scheduleType: ScheduleType;
 }) {
   const [baseYear, setBaseYear] = useState(2025);
   const [baseMonth, setBaseMonth] = useState(0);
@@ -48,13 +79,15 @@ function DateRangeCalendar({
       </div>
       <div className="grid grid-cols-7">
         {buildCells(year, month).map((cell, i) => {
+          const booked = cell.cur && isBooked(year, month, cell.day, scheduleType);
           const isStart = startDate && cell.cur && startDate.getFullYear() === year && startDate.getMonth() === month && startDate.getDate() === cell.day;
           const isEnd = endDate && cell.cur && endDate.getFullYear() === year && endDate.getMonth() === month && endDate.getDate() === cell.day;
           const inRange = cell.cur && isInRange(year, month, cell.day);
           return (
-            <button key={i} type="button" disabled={!cell.cur}
+            <button key={i} type="button" disabled={!cell.cur || booked}
+              title={booked ? "Already booked" : undefined}
               onClick={() => {
-                if (!cell.cur) return;
+                if (!cell.cur || booked) return;
                 const newDate = new Date(year, month, cell.day);
                 if (startDate && endDate) { onSelectStart(newDate); onSelectEnd(null as any); }
                 else if (startDate && !endDate) { if (newDate < startDate) { onSelectEnd(startDate); onSelectStart(newDate); } else { onSelectEnd(newDate); } }
@@ -62,6 +95,7 @@ function DateRangeCalendar({
               }}
               className={cn("text-center py-1.5 text-sm rounded-full mx-auto w-8 h-8 flex items-center justify-center transition-colors",
                 !cell.cur ? "text-gray-300 cursor-default" :
+                booked ? "text-gray-300 line-through cursor-not-allowed bg-gray-100" :
                 isStart || isEnd ? "bg-brand-primary text-white font-semibold" :
                 inRange ? "bg-brand-primary/20 text-gray-700" :
                 "text-gray-700 hover:bg-red-50")}>
@@ -86,7 +120,7 @@ function DateRangeCalendar({
   );
 }
 
-function DualCalendar({ selected, onSelect }: { selected: Date | null; onSelect: (d: Date) => void }) {
+function DualCalendar({ selected, onSelect, scheduleType }: { selected: Date | null; onSelect: (d: Date) => void; scheduleType: ScheduleType }) {
   const [baseYear, setBaseYear] = useState(2025);
   const [baseMonth, setBaseMonth] = useState(0);
 
@@ -102,12 +136,15 @@ function DualCalendar({ selected, onSelect }: { selected: Date | null; onSelect:
       </div>
       <div className="grid grid-cols-7">
         {buildCells(year, month).map((cell, i) => {
+          const booked = cell.cur && isBooked(year, month, cell.day, scheduleType);
           const isSelected = selected && cell.cur && selected.getFullYear() === year && selected.getMonth() === month && selected.getDate() === cell.day;
           return (
-            <button key={i} type="button" disabled={!cell.cur}
-              onClick={() => cell.cur && onSelect(new Date(year, month, cell.day))}
+            <button key={i} type="button" disabled={!cell.cur || booked}
+              title={booked ? "Already booked" : undefined}
+              onClick={() => { if (cell.cur && !booked) onSelect(new Date(year, month, cell.day)); }}
               className={cn("text-center py-1.5 text-sm rounded-full mx-auto w-8 h-8 flex items-center justify-center transition-colors",
                 !cell.cur ? "text-gray-300 cursor-default" :
+                booked ? "text-gray-300 line-through cursor-not-allowed bg-gray-100" :
                 isSelected ? "bg-brand-primary text-white font-semibold" :
                 "text-gray-700 hover:bg-red-50")}>
               {cell.day}
@@ -222,6 +259,7 @@ export function ScheduleStep({ onUpdate }: { onUpdate?: (s: ScheduleSnapshot) =>
               <DateRangeCalendar
                 startDate={adHocStartDate} endDate={adHocEndDate}
                 onSelectStart={setAdHocStartDate} onSelectEnd={setAdHocEndDate}
+                scheduleType={scheduleType}
               />
               <div className="flex gap-4 mt-5">
                 <CustomSelect value={startTime} onChange={setStartTime} options={TIME_OPTIONS} placeholder="Select start time" className="flex-1" />
@@ -229,7 +267,7 @@ export function ScheduleStep({ onUpdate }: { onUpdate?: (s: ScheduleSnapshot) =>
               </div>
             </>
           ) : (
-            <DualCalendar selected={selectedDate} onSelect={setSelectedDate} />
+            <DualCalendar selected={selectedDate} onSelect={setSelectedDate} scheduleType={scheduleType} />
           )}
         </div>
       </div>
