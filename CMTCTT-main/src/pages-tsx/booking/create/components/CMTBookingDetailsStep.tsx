@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Formik, Form, Field, ErrorMessage } from "formik";
 import * as Yup from "yup";
-import { ChevronDown, ChevronLeft, ChevronRight, Check, Minus, Plus } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Check, Minus, Plus, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -41,7 +41,20 @@ const DEFAULT_PLATFORM_VARIANTS: VariantItem[] = [
   { id: "50HMG", label: "50HMG", selected: false, qty: 1 },
 ];
 
-const BRIEFING_ROOMS   = ["Briefing Room A", "Briefing Room B", "Briefing Room C", "Briefing Room D"];
+const BRIEFING_ROOMS = [
+  "Briefing Room A",
+  "Briefing Room B",
+  "Briefing Room C",
+  "Briefing Room D",
+  "Briefing Room E",
+  "Briefing Room F",
+  "Conference Room 1",
+  "Conference Room 2",
+  "Training Hall Alpha",
+  "Training Hall Bravo",
+  "Ops Room 1",
+  "Ops Room 2",
+];
 const SCHEDULE_OPTIONS = [
   { value: "AM/PM",    label: "AM/PM Schedule"   },
   { value: "Full Day", label: "Full Day Schedule" },
@@ -449,9 +462,10 @@ interface Props {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function CMTBookingDetailsStep({ onNext }: Props) {
-  const [calYear,      setCalYear]      = useState(2025);
-  const [calMonth,     setCalMonth]     = useState(0);
-  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
+  const [calYear,        setCalYear]        = useState(2025);
+  const [calMonth,       setCalMonth]       = useState(0);
+  const [selectedDate,   setSelectedDate]   = useState<Date | null>(null);
+  const [briefingSearch, setBriefingSearch] = useState("");
 
   const month2 = calMonth === 11 ? 0          : calMonth + 1;
   const year2  = calMonth === 11 ? calYear + 1 : calYear;
@@ -751,28 +765,95 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                       </div>
                     )}
 
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
+                  </div>{/* /Box 3 */}
+
+                </div>{/* /LEFT COLUMN */}
+
+                {/* ── RIGHT COLUMN: Calendar + Briefing Room ──────── */}
+                <div className="space-y-4">
+
+                  {/* Calendar */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-5">
+                    <p className="text-sm font-medium text-gray-700 mb-4">
+                      Select Date Slot <span className="text-brand-primary">*</span>
+                    </p>
+                    <div className="flex items-start gap-1">
+                      <button type="button" onClick={prevMonth}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0 mt-1">
+                        <ChevronLeft size={15} />
+                      </button>
+                      <div className="flex-1 flex gap-4 min-w-0">
+                        <MonthView year={calYear} month={calMonth} selected={selectedDate} onSelect={setSelectedDate} scheduleType={values.scheduleType} />
+                        <div className="w-px bg-gray-100 flex-shrink-0 self-stretch" />
+                        <MonthView year={year2}   month={month2}   selected={selectedDate} onSelect={setSelectedDate} scheduleType={values.scheduleType} />
+                      </div>
+                      <button type="button" onClick={nextMonth}
+                        className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0 mt-1">
+                        <ChevronRight size={15} />
+                      </button>
+                    </div>
+                    {selectedDate && (
+                      <p className="mt-4 text-xs text-center text-brand-primary font-medium">
+                        {selectedDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* Briefing Room */}
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <label className="text-sm font-medium text-gray-700">
                         Briefing Room <span className="text-brand-primary">*</span>
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
-                        {BRIEFING_ROOMS.map(room => {
+                      {values.briefingRooms.length > 0 && (
+                        <span className="text-xs font-semibold text-brand-primary bg-red-50 border border-red-100 rounded-full px-2.5 py-0.5">
+                          {values.briefingRooms.length} selected
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Search */}
+                    <div className="relative">
+                      <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
+                      <input
+                        type="text"
+                        placeholder="Search briefing rooms…"
+                        value={briefingSearch}
+                        onChange={e => setBriefingSearch(e.target.value)}
+                        className="w-full pl-8 pr-3 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-brand-primary focus:border-brand-primary"
+                      />
+                    </div>
+
+                    {/* Scrollable list */}
+                    <div className="max-h-44 overflow-y-auto space-y-1 pr-0.5">
+                      {(() => {
+                        const filtered = BRIEFING_ROOMS.filter(r =>
+                          r.toLowerCase().includes(briefingSearch.toLowerCase())
+                        );
+                        if (filtered.length === 0) return (
+                          <p className="text-sm text-gray-400 text-center py-3">No rooms match your search</p>
+                        );
+                        return filtered.map(room => {
                           const isSelected = values.briefingRooms.includes(room);
                           return (
-                            <label key={room} className={cn(
-                              "flex items-center gap-2 px-3 py-2.5 border rounded-lg cursor-pointer text-sm transition-colors",
-                              isSelected
-                                ? "border-brand-primary bg-brand-primary text-white"
-                                : "border-gray-200 text-gray-600 hover:border-gray-300"
-                            )}>
+                            <label
+                              key={room}
+                              className={cn(
+                                "flex items-center gap-2.5 px-3 py-2.5 border rounded-lg cursor-pointer text-sm transition-colors",
+                                isSelected
+                                  ? "border-brand-primary bg-red-50 text-brand-primary"
+                                  : "border-gray-200 text-gray-600 hover:border-gray-300 hover:bg-gray-50"
+                              )}
+                            >
                               <span className={cn(
                                 "w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-colors",
-                                isSelected ? "border-white bg-white" : "border-gray-300"
+                                isSelected ? "bg-brand-primary border-brand-primary" : "border-gray-300"
                               )}>
-                                {isSelected && <Check size={10} className="text-brand-primary" strokeWidth={3} />}
+                                {isSelected && <Check size={10} className="text-white" strokeWidth={3} />}
                               </span>
                               <input
-                                type="checkbox" checked={isSelected}
+                                type="checkbox"
+                                checked={isSelected}
                                 onChange={() => {
                                   const next = isSelected
                                     ? values.briefingRooms.filter(r => r !== room)
@@ -784,41 +865,14 @@ export function CMTBookingDetailsStep({ onNext }: Props) {
                               {room}
                             </label>
                           );
-                        })}
-                      </div>
-                      <ErrorMessage name="briefingRooms" component="p" className="mt-1 text-xs text-red-500" />
+                        });
+                      })()}
                     </div>
 
-                  </div>{/* /Box 3 */}
-
-                </div>{/* /LEFT COLUMN */}
-
-                {/* ── RIGHT COLUMN: Calendar ──────────────────────── */}
-                <div className="bg-white rounded-xl border border-gray-200 p-5">
-                  <p className="text-sm font-medium text-gray-700 mb-4">
-                    Select Date Slot <span className="text-brand-primary">*</span>
-                  </p>
-                  <div className="flex items-start gap-1">
-                    <button type="button" onClick={prevMonth}
-                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0 mt-1">
-                      <ChevronLeft size={15} />
-                    </button>
-                    <div className="flex-1 flex gap-4 min-w-0">
-                      <MonthView year={calYear} month={calMonth} selected={selectedDate} onSelect={setSelectedDate} scheduleType={values.scheduleType} />
-                      <div className="w-px bg-gray-100 flex-shrink-0 self-stretch" />
-                      <MonthView year={year2}   month={month2}   selected={selectedDate} onSelect={setSelectedDate} scheduleType={values.scheduleType} />
-                    </div>
-                    <button type="button" onClick={nextMonth}
-                      className="p-1.5 rounded-lg hover:bg-gray-100 text-gray-500 transition-colors flex-shrink-0 mt-1">
-                      <ChevronRight size={15} />
-                    </button>
+                    <ErrorMessage name="briefingRooms" component="p" className="text-xs text-red-500" />
                   </div>
-                  {selectedDate && (
-                    <p className="mt-4 text-xs text-center text-brand-primary font-medium">
-                      {selectedDate.toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" })}
-                    </p>
-                  )}
-                </div>
+
+                </div>{/* /RIGHT COLUMN */}
 
               </div>{/* /grid */}
             </Form>
