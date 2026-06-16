@@ -1,7 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
 import {
-  X, Plus, ChevronDown,
-  ArrowLeft, Pencil, Check, Trash2, GripVertical,
+  X, Check, Trash2, GripVertical, ArrowLeft, Pencil,
 } from "lucide-react";
 import { Button } from "@/components/button";
 import { cn } from "@/lib/utils";
@@ -26,6 +25,7 @@ export interface EditableCabin {
   platformType: string;
   callsign:     string;
   trainees:     EditableTrainee[];
+  batchIdx:     number;
 }
 
 interface PointerDrag {
@@ -39,17 +39,6 @@ interface PointerDrag {
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
-
-const ROLES = ["VC", "VO", "TC/PC", "TC", "SC", "SO"];
-
-const PLATFORM_OPTIONS = [
-  "Terrex 50 HMG",
-  "Terrex 40 AGL",
-  "L2SG",
-  "PCSV Mortar",
-  "ICV (TERREX)",
-  "Engineer (BRONCO)",
-];
 
 const ROLE_COLOUR: Record<string, string> = {
   VC:      "bg-blue-100   text-blue-700",
@@ -74,151 +63,57 @@ function RoleBadge({ role, sm }: { role: string; sm?: boolean }) {
   );
 }
 
-function useClickOutside(ref: React.RefObject<HTMLElement | null>, cb: () => void) {
-  useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) cb();
-    };
-    document.addEventListener("mousedown", h);
-    return () => document.removeEventListener("mousedown", h);
-  }, [ref, cb]);
-}
+// ── UID factory ────────────────────────────────────────────────────────────────
 
-// ── Role picker ───────────────────────────────────────────────────────────────
+let _uid = 0;
+const uid = () => `${++_uid}`;
 
-function RolePicker({ value, onChange }: { value: string; onChange: (r: string) => void }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-  useClickOutside(ref, () => setOpen(false));
-  return (
-    <div ref={ref} className="relative shrink-0">
-      <button
-        type="button"
-        onPointerDown={e => e.stopPropagation()} // don't start drag from role picker
-        onClick={() => setOpen(v => !v)}
-        className={cn(
-          "inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] font-bold tracking-wide cursor-pointer hover:opacity-80",
-          ROLE_COLOUR[value] ?? "bg-gray-100 text-gray-600",
-        )}
-      >
-        {value}
-        <ChevronDown size={10} />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-30 py-1 min-w-[90px]">
-          {ROLES.map(r => (
-            <button
-              key={r}
-              type="button"
-              onClick={() => { onChange(r); setOpen(false); }}
-              className="w-full text-left px-3 py-1.5 text-xs hover:bg-gray-50 flex items-center justify-between gap-2"
-            >
-              <RoleBadge role={r} />
-              {r === value && <Check size={11} className="text-green-500" />}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+type RawCabin = {
+  cabin: string; platformType: string; callsign: string;
+  trainees: Array<{ role: string; name: string; nric: string; rank: string; callsign?: string; batch: string; course: string; unit: string }>;
+};
+
+function initEditable(batches: RawCabin[][]): EditableCabin[] {
+  return batches.flatMap((batch, batchIdx) =>
+    batch.map(g => ({
+      _id: uid(), cabin: g.cabin, platformType: g.platformType, callsign: g.callsign, batchIdx,
+      trainees: g.trainees.map(t => ({
+        _id: uid(), role: t.role, name: t.name, nric: t.nric, rank: t.rank,
+        callsign: t.callsign ?? "", batch: t.batch, course: t.course, unit: t.unit,
+      })),
+    }))
   );
 }
 
-// ── Add Detail modal ───────────────────────────────────────────────────────────
-
-function AddDetailModal({ onAdd, onClose }: {
-  onAdd: (c: Omit<EditableCabin, "_id" | "trainees">) => void;
-  onClose: () => void;
-}) {
-  const [name, setName] = useState("");
-  const [platform, setPlatform] = useState(PLATFORM_OPTIONS[0]);
-  const [callsign, setCallsign] = useState("");
-  const valid = name.trim().length > 0;
-
-  return (
-    <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
-      <div className="bg-white rounded-2xl shadow-xl w-[420px] p-6">
-        <div className="flex items-center justify-between mb-5">
-          <h3 className="text-base font-bold text-gray-800">Add New Detail</h3>
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
-        </div>
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Detail Name</label>
-            <input type="text" placeholder="e.g. CMT05" value={name} onChange={e => setName(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary" />
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Platform Type</label>
-            <div className="relative">
-              <select value={platform} onChange={e => setPlatform(e.target.value)}
-                className="w-full appearance-none border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white focus:outline-none pr-8">
-                {PLATFORM_OPTIONS.map(p => <option key={p} value={p}>{p}</option>)}
-              </select>
-              <ChevronDown size={13} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" />
-            </div>
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1 block">Callsign</label>
-            <input type="text" placeholder="e.g. 15Z" value={callsign} onChange={e => setCallsign(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand-primary/20 focus:border-brand-primary" />
-          </div>
-        </div>
-        <div className="grid grid-cols-2 gap-3 mt-6">
-          <button type="button" onClick={onClose}
-            className="py-2.5 text-sm font-semibold text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50">Cancel</button>
-          <button type="button" disabled={!valid}
-            onClick={() => { onAdd({ cabin: name.trim(), platformType: platform, callsign: callsign.trim() }); onClose(); }}
-            className={cn("py-2.5 text-sm font-semibold rounded-lg", valid ? "bg-brand-primary text-white hover:bg-brand-primary-hover" : "bg-gray-100 text-gray-400 cursor-not-allowed")}>
-            Add Detail
-          </button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ── Assign Trainee modal ───────────────────────────────────────────────────────
-
-// ── Editable cabin card ────────────────────────────────────────────────────────
+// ── Cabin card ────────────────────────────────────────────────────────────────
 
 function EditableCabinCard({
-  cabin, drag, onPointerDownTrainee,
-  onRemoveTrainee, onChangeRole, onRemoveCabin,
+  cabin, drag, onPointerDownTrainee, onRemoveTrainee, onRemoveCabin,
 }: {
   cabin:                EditableCabin;
   drag:                 PointerDrag | null;
   onPointerDownTrainee: (e: React.PointerEvent, t: EditableTrainee) => void;
   onRemoveTrainee:      (traineeId: string, cabinId: string) => void;
-  onChangeRole:         (traineeId: string, cabinId: string, role: string) => void;
   onRemoveCabin:        (cabinId: string) => void;
 }) {
-  const isCMT    = cabin.cabin.startsWith("CMT");
+  const isCMT      = cabin.cabin.startsWith("CMT");
   const isDragging = drag !== null;
-  const isSource = drag?.sourceCabinId === cabin._id;
-  // Can swap only if destination cabin ALSO has a trainee with the same role
-  const canDrop  = isDragging && !isSource
-    && cabin.trainees.some(t => t.role === drag!.role);
+  const isSource   = drag?.sourceCabinId === cabin._id;
+  const canDrop    = isDragging && !isSource;
 
   return (
     <div
       data-cabin-id={cabin._id}
       className={cn(
         "bg-white rounded-xl flex flex-col border-2 transition-colors",
-        !isDragging                        && "border-gray-200",
-        isDragging && canDrop              && "border-green-400 ring-2 ring-green-100 shadow-lg",
-        isDragging && !canDrop && !isSource && "border-gray-100 opacity-40",
-        isDragging && isSource             && "border-gray-200 opacity-60",
+        !isDragging                          && "border-gray-200",
+        isDragging && canDrop                && "border-blue-300 ring-2 ring-blue-100 shadow-md",
+        isDragging && isSource               && "border-gray-200 opacity-60",
       )}
     >
-      {/* Visual drop cue */}
       {isDragging && canDrop && (
-        <div className="bg-green-500 text-white text-xs font-bold text-center py-1.5 rounded-t-xl">
-          ↓ Move here
-        </div>
-      )}
-      {isDragging && !canDrop && !isSource && (
-        <div className="bg-gray-100 text-gray-400 text-xs text-center py-1.5 rounded-t-xl">
-          No {drag!.role} role here
+        <div className="bg-blue-500 text-white text-xs font-bold text-center py-1 rounded-t-xl">
+          ↓ Drop here
         </div>
       )}
 
@@ -267,9 +162,7 @@ function EditableCabinCard({
               )}
             >
               <GripVertical size={12} className="text-gray-300 shrink-0" />
-              <div onPointerDown={e => e.stopPropagation()}>
-                <RolePicker value={t.role} onChange={role => onChangeRole(t._id, cabin._id, role)} />
-              </div>
+              <RoleBadge role={t.role} />
               <span className="text-[11px] text-gray-400 font-mono shrink-0 w-8">{t.rank}</span>
               <span className="flex-1 text-xs text-gray-700 truncate min-w-0" data-cabin-id={cabin._id}>{t.name}</span>
               <button type="button"
@@ -282,53 +175,32 @@ function EditableCabinCard({
           );
         })}
       </div>
-
     </div>
   );
-}
-
-// ── UID factory ────────────────────────────────────────────────────────────────
-
-let _uid = 0;
-const uid = () => `${++_uid}`;
-
-function initEditable(groups: Array<{
-  cabin: string; platformType: string; callsign: string;
-  trainees: Array<{ role: string; name: string; nric: string; rank: string; callsign?: string; batch: string; course: string; unit: string }>;
-}>): EditableCabin[] {
-  return groups.map(g => ({
-    _id: uid(), cabin: g.cabin, platformType: g.platformType, callsign: g.callsign,
-    trainees: g.trainees.map(t => ({
-      _id: uid(), role: t.role, name: t.name, nric: t.nric, rank: t.rank,
-      callsign: t.callsign ?? "", batch: t.batch, course: t.course, unit: t.unit,
-    })),
-  }));
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export function CMTConfigureDetailList({
-  initialCabins, onClose, onSave,
+  initialBatches, onClose, onSave,
 }: {
-  initialCabins: Array<{
-    cabin: string; platformType: string; callsign: string;
-    trainees: Array<{ role: string; name: string; nric: string; rank: string; callsign?: string; batch: string; course: string; unit: string }>;
-  }>;
+  initialBatches: RawCabin[][];
   onClose: () => void;
   onSave:  (cabins: EditableCabin[]) => void;
 }) {
-  const [cabins,        setCabins]        = useState<EditableCabin[]>(() => initEditable(initialCabins));
-  const [showAddDetail, setShowAddDetail] = useState(false);
-  const [hasChanges,    setHasChanges]    = useState(false);
-  const [drag,          setDrag]          = useState<PointerDrag | null>(null);
-  const dragRef = useRef<PointerDrag | null>(null);
+  const [cabins,      setCabins]      = useState<EditableCabin[]>(() => initEditable(initialBatches));
+  const [activeBatch, setActiveBatch] = useState(0);
+  const [hasChanges,  setHasChanges]  = useState(false);
+  const [drag,        setDrag]        = useState<PointerDrag | null>(null);
+  const dragRef  = useRef<PointerDrag | null>(null);
   const cabinsRef = useRef(cabins);
-
   useEffect(() => { cabinsRef.current = cabins; }, [cabins]);
 
+  const batchCount    = initialBatches.length;
   const totalTrainees = cabins.reduce((s, c) => s + c.trainees.length, 0);
+  const batchCabins   = cabins.filter(c => c.batchIdx === activeBatch);
 
-  // ── Pointer drag — global listeners ──────────────────────────────────────
+  // ── Pointer drag ──────────────────────────────────────────────────────────
 
   const handlePointerMove = useCallback((e: PointerEvent) => {
     if (!dragRef.current) return;
@@ -340,7 +212,6 @@ export function CMTConfigureDetailList({
     const d = dragRef.current;
     if (!d) return;
 
-    // Walk up from the element under cursor to find a cabin
     let el = document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null;
     let targetCabinId: string | null = null;
     while (el) {
@@ -351,8 +222,7 @@ export function CMTConfigureDetailList({
     if (targetCabinId && targetCabinId !== d.sourceCabinId) {
       setCabins(prev => {
         const target = prev.find(c => c._id === targetCabinId);
-        // Destination must have a trainee with the same role
-        if (!target || !target.trainees.some(t => t.role === d.role)) return prev;
+        if (!target) return prev;
 
         const next     = prev.map(c => ({ ...c, trainees: [...c.trainees] }));
         const srcCabin = next.find(c => c._id === d.sourceCabinId)!;
@@ -361,10 +231,8 @@ export function CMTConfigureDetailList({
         const srcIdx = srcCabin.trainees.findIndex(t => t._id === d.traineeId);
         if (srcIdx === -1) return prev;
 
-        // Remove from source, add to destination
         const [trainee] = srcCabin.trainees.splice(srcIdx, 1);
         tgtCabin.trainees.push(trainee);
-
         return next;
       });
       setHasChanges(true);
@@ -376,7 +244,6 @@ export function CMTConfigureDetailList({
     document.body.style.userSelect = "";
   }, []);
 
-  // Attach / detach global listeners when drag is active
   useEffect(() => {
     if (!drag) return;
     window.addEventListener("pointermove", handlePointerMove);
@@ -389,8 +256,6 @@ export function CMTConfigureDetailList({
     };
   }, [!!drag, handlePointerMove, handlePointerUp]);
 
-  // ── Start drag ────────────────────────────────────────────────────────────
-
   const startDrag = (e: React.PointerEvent, t: EditableTrainee, cabinId: string) => {
     e.preventDefault();
     const d: PointerDrag = {
@@ -400,7 +265,7 @@ export function CMTConfigureDetailList({
     };
     dragRef.current = d;
     setDrag(d);
-    document.body.style.cursor    = "grabbing";
+    document.body.style.cursor     = "grabbing";
     document.body.style.userSelect = "none";
   };
 
@@ -415,22 +280,13 @@ export function CMTConfigureDetailList({
       c._id !== cabinId ? c : { ...c, trainees: c.trainees.filter(t => t._id !== traineeId) }
     ));
 
-  const changeRole = (traineeId: string, cabinId: string, role: string) =>
-    mutate(prev => prev.map(c =>
-      c._id !== cabinId ? c : { ...c, trainees: c.trainees.map(t => t._id !== traineeId ? t : { ...t, role }) }
-    ));
-
-  const addDetail = (data: Omit<EditableCabin, "_id" | "trainees">) =>
-    mutate(prev => [...prev, { _id: uid(), ...data, trainees: [] }]);
-
   const removeCabin = (cabinId: string) =>
     mutate(prev => prev.filter(c => c._id !== cabinId));
-
 
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
-    <div className="fixed inset-0 bg-gray-50 z-40 flex flex-col">
+    <div className="fixed inset-0 bg-gray-50 z-[1200] flex flex-col">
 
       {/* Top bar */}
       <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between gap-4">
@@ -465,40 +321,97 @@ export function CMTConfigureDetailList({
         </div>
       </div>
 
-      {/* Drag hint */}
+      {/* Drag banner */}
       {drag && (
         <div className="flex-shrink-0 bg-blue-600 text-white text-xs font-medium py-2 text-center">
-          Moving <span className="font-bold">{drag.name}</span> ({drag.role}) — drop onto any cabin that has <span className="font-bold">{drag.role}</span>
+          Moving <span className="font-bold">{drag.name}</span> ({drag.role}) — drop onto any cabin to reassign
+        </div>
+      )}
+
+      {/* Batch tabs */}
+      {batchCount > 1 && (
+        <div className="flex-shrink-0 bg-white border-b border-gray-200 px-6 flex items-center gap-0">
+          {Array.from({ length: batchCount }, (_, i) => {
+            const count = cabins.filter(c => c.batchIdx === i).reduce((s, c) => s + c.trainees.length, 0);
+            return (
+              <button
+                key={i}
+                type="button"
+                onClick={() => setActiveBatch(i)}
+                className={cn(
+                  "px-5 py-3 text-sm font-medium border-b-2 -mb-px transition-colors flex items-center gap-1.5",
+                  activeBatch === i
+                    ? "border-brand-primary text-brand-primary"
+                    : "border-transparent text-gray-500 hover:text-gray-700",
+                )}
+              >
+                Batch {i + 1}
+                <span className={cn(
+                  "text-[11px] font-bold px-1.5 py-0.5 rounded-full",
+                  activeBatch === i ? "bg-brand-primary text-white" : "bg-gray-100 text-gray-500",
+                )}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+
+          {/* Cross-batch drop zones — visible during drag */}
+          {drag && (
+            <div className="ml-auto flex items-center gap-2 pr-1">
+              <span className="text-xs text-gray-400 mr-1">Move to:</span>
+              {Array.from({ length: batchCount }, (_, i) => i !== activeBatch && (
+                <div
+                  key={i}
+                  data-batch-drop={i}
+                  onPointerUp={() => {
+                    const d = dragRef.current;
+                    if (!d) return;
+                    // Move trainee to first cabin of target batch
+                    setCabins(prev => {
+                      const tgtBatchCabins = prev.filter(c => c.batchIdx === i);
+                      if (tgtBatchCabins.length === 0) return prev;
+                      const next     = prev.map(c => ({ ...c, trainees: [...c.trainees] }));
+                      const srcCabin = next.find(c => c._id === d.sourceCabinId)!;
+                      const tgtCabin = next.find(c => c._id === tgtBatchCabins[0]._id)!;
+                      const srcIdx   = srcCabin.trainees.findIndex(t => t._id === d.traineeId);
+                      if (srcIdx === -1) return prev;
+                      const [trainee] = srcCabin.trainees.splice(srcIdx, 1);
+                      tgtCabin.trainees.push(trainee);
+                      return next;
+                    });
+                    setHasChanges(true);
+                    setActiveBatch(i);
+                    dragRef.current = null;
+                    setDrag(null);
+                    document.body.style.cursor = "";
+                    document.body.style.userSelect = "";
+                  }}
+                  className="px-3 py-1.5 text-xs font-bold rounded-lg border-2 border-dashed border-blue-400 text-blue-600 bg-blue-50 hover:bg-blue-100 cursor-copy select-none"
+                >
+                  Batch {i + 1}
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
       {/* Content */}
       <div className="flex-1 overflow-auto p-6">
-        <div className="mb-5">
-          <button type="button" onClick={() => setShowAddDetail(true)}
-            className="flex items-center gap-2 px-4 py-2.5 text-sm font-semibold text-brand-primary border border-dashed border-brand-primary/50 rounded-xl hover:bg-red-50 hover:border-brand-primary transition-colors">
-            <Plus size={15} /> Add New Details
-          </button>
-        </div>
-
-        {cabins.length === 0 ? (
+        {batchCabins.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-24 text-center">
-            <div className="w-14 h-14 rounded-full bg-gray-100 flex items-center justify-center mb-4">
-              <Plus size={22} className="text-gray-400" />
-            </div>
-            <p className="text-sm font-semibold text-gray-500">No details yet</p>
-            <p className="text-xs text-gray-400 mt-1">Click "Add New Details" to get started</p>
+            <p className="text-sm font-semibold text-gray-500">No details in this batch</p>
           </div>
         ) : (
           <div className="grid grid-cols-3 gap-4">
-            {cabins.map(c => (
+            {batchCabins.map(c => (
               <EditableCabinCard
                 key={c._id}
                 cabin={c}
                 drag={drag}
                 onPointerDownTrainee={(e, t) => startDrag(e, t, c._id)}
                 onRemoveTrainee={removeTrainee}
-                onChangeRole={changeRole}
                 onRemoveCabin={removeCabin}
               />
             ))}
@@ -506,16 +419,10 @@ export function CMTConfigureDetailList({
         )}
       </div>
 
-      {/* Ghost element — follows cursor, pointer-events:none so elementFromPoint works */}
+      {/* Ghost element */}
       {drag && (
         <div
-          style={{
-            position: "fixed",
-            left: drag.cursorX + 14,
-            top:  drag.cursorY + 8,
-            pointerEvents: "none",
-            zIndex: 9999,
-          }}
+          style={{ position: "fixed", left: drag.cursorX + 14, top: drag.cursorY + 8, pointerEvents: "none", zIndex: 9999 }}
           className="bg-white border-2 border-blue-400 rounded-xl px-3 py-2 shadow-2xl flex items-center gap-2"
         >
           <GripVertical size={12} className="text-blue-300" />
@@ -523,10 +430,6 @@ export function CMTConfigureDetailList({
           <span className="text-[11px] text-gray-400 font-mono">{drag.rank}</span>
           <span className="text-xs font-semibold text-gray-800">{drag.name}</span>
         </div>
-      )}
-
-      {showAddDetail && (
-        <AddDetailModal onAdd={addDetail} onClose={() => setShowAddDetail(false)} />
       )}
     </div>
   );

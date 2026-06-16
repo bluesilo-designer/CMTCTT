@@ -55,7 +55,7 @@ export const CMT_BATCH_SCENARIOS: BatchScenarioDef[] = [
   { id: "s1", label: "1 Batch",    cabinCount: 4,  rolesPerCabin: 3, totalTrainees: 12 },
   { id: "s2", label: "2 Batches",  cabinCount: 4,  rolesPerCabin: 3, totalTrainees: 24 },
   { id: "s3", label: "3 Batches",  cabinCount: 4,  rolesPerCabin: 3, totalTrainees: 30 },
-  { id: "s4", label: "12 Cabins",  cabinCount: 12, rolesPerCabin: 3, totalTrainees: 36 },
+  { id: "s4", label: "12 Cabins",  cabinCount: 12, rolesPerCabin: 3, totalTrainees: 120 },
   { id: "s5", label: "Worst Case", cabinCount: 12, rolesPerCabin: 5, totalTrainees: 65 },
 ];
 

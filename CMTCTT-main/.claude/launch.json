@@ -4,8 +4,8 @@
     {
       "name": "trms-dev",
       "runtimeExecutable": "npm",
-      "runtimeArgs": ["run", "dev", "--", "--port", "8450"],
-      "port": 8450
+      "runtimeArgs": ["run", "dev", "--", "--port", "4000"],
+      "port": 4000
     }
   ]
 }

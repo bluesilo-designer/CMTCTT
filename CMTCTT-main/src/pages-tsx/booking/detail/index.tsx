@@ -7,7 +7,7 @@ import { CMTDetailListTab } from "./components/CMTDetailListTab";
 import { LaneConfigTable } from "./components/LaneConfigTable";
 import { BookingDetailListTab } from "./components/BookingDetailListTab";
 import { CMTCabinConfigStep } from "../create/components/CMTCabinConfigStep";
-import type { CabinRow } from "../create/components/CMTCabinConfigStep";
+import type { CabinRow, IosEntry } from "../create/components/CMTCabinConfigStep";
 import { OnboardingFlow } from "./components/OnboardingFlow";
 import { CMTOnboardingFlow } from "./components/CMTOnboardingFlow";
 import { CMTCTTOnboardingFlow } from "./components/CMTCTTOnboardingFlow";
@@ -37,6 +37,11 @@ const DETAIL_DEMO_CABINS: CabinRow[] = [
   { id: "CMT10", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
   { id: "CMT11", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
   { id: "CMT12", occupied: true,  selected: false, callSign: "",    weaponVariant: "",      role: ""          },
+];
+
+const DETAIL_DEMO_IOS_LIST: IosEntry[] = [
+  { uid: 1, iosDevice: "Main IOS 3", baseStation: "BMS1ForceSide", masterIOS: "Yes",  forceType: "Opposing" },
+  { uid: 2, iosDevice: "Main IOS 1", baseStation: "BMS1ForceSide", masterIOS: "No",   forceType: "Friendly" },
 ];
 
 // ── Mock booking base data ────────────────────────────────────────────────────
@@ -507,7 +512,6 @@ export function BookingDetail() {
           {/* Tab: Booking Details */}
           {!isCMTCTT && activeTab === "Booking Details" && (() => {
             const sessionLabel = BOOKING.time?.match(/\(([^)]+)\)/)?.[1] ?? "—";
-            const platformTypes = selectedBooking?.weapon ?? "—";
             return (
             <div className="space-y-5">
               <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
@@ -527,7 +531,9 @@ export function BookingDetail() {
                   </div>
                   <Field label="Program" value={BOOKING.program} />
                   <Field label="Briefing Room" value={BOOKING.briefingRoom} />
-                  <Field label="Courseware" value={BOOKING.courseware} />
+                  {!(BOOKING.isCMT && BOOKING.status === "Upcoming") && (
+                    <Field label="Courseware" value={BOOKING.courseware} />
+                  )}
                   <Field label="Trainee" value={`${BOOKING.traineesCount} Trainee(s)`} />
                   <Field label="Assignment ID" value={<span className="text-gray-400">—</span>} />
                   <Field label="ATMS File" value={BOOKING.atmsFile} />
@@ -545,24 +551,43 @@ export function BookingDetail() {
               </div>
 
               {BOOKING.isCMT ? (
-                <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
-                  <h2 className="text-sm font-bold text-gray-700 mb-5">Platform Configuration</h2>
-                  <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
-                    <Field label="Booking Type" value="Compartment Selection" />
-                    <Field label="Vehicle Type" value="ICV (TERREX)" />
-                    <div>
-                      <dt className="text-xs text-gray-400 mb-1">Platform Type</dt>
-                      <dd className="flex flex-wrap gap-1.5">
-                        {platformTypes.split(",").map((p: string) => (
-                          <span key={p.trim()} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
-                            {p.trim()}
-                          </span>
-                        ))}
-                      </dd>
-                    </div>
-                    <Field label="Base Station" value="BMS1ForceSide" />
-                  </dl>
-                </div>
+                <>
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+                    <h2 className="text-sm font-bold text-gray-700 mb-5">Platform Configuration</h2>
+                    <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
+                      <Field label="Booking Type" value="Compartment Selection" />
+                      <Field label="Vehicle Type" value="ICV (TERREX)" />
+                      <div>
+                        <dt className="text-xs text-gray-400 mb-1">Platform Type</dt>
+                        <dd className="flex flex-wrap gap-1.5">
+                          {(() => {
+                            const counts = DETAIL_DEMO_CABINS
+                              .filter(c => c.selected && c.weaponVariant)
+                              .reduce<Record<string, number>>((acc, c) => {
+                                acc[c.weaponVariant] = (acc[c.weaponVariant] || 0) + 1;
+                                return acc;
+                              }, {});
+                            return Object.entries(counts).map(([variant, count]) => (
+                              <span key={variant} className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-gray-100 text-gray-700 border border-gray-200">
+                                {variant} ({count} unit{count > 1 ? "s" : ""})
+                              </span>
+                            ));
+                          })()}
+                        </dd>
+                      </div>
+                      <Field label="Base Station" value="BMS1ForceSide" />
+                    </dl>
+                  </div>
+
+                  <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
+                    <h2 className="text-sm font-bold text-gray-700 mb-5">Unit Information</h2>
+                    <dl className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-8 gap-y-5">
+                      <Field label="Unit Name" value={selectedBooking?.unitName ?? "Unit 10"} />
+                      <Field label="Unit Contact" value="CPT Ahmad Rizal" />
+                      <Field label="Unit Contact Details" value="+65 9123 4567 • ahmad.rizal@mil.sg" />
+                    </dl>
+                  </div>
+                </>
               ) : (
                 <>
                   <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-6">
@@ -680,8 +705,9 @@ export function BookingDetail() {
                 bookingDetails={null}
                 gridCols="grid-cols-[70%_30%]"
                 initialCabins={localData?.cabins ?? DETAIL_DEMO_CABINS}
-                initialIosList={localData?.iosList}
+                initialIosList={localData?.iosList ?? DETAIL_DEMO_IOS_LIST}
                 lastUpdated="17 Jan 2025 09:29 AM"
+                weaponVariantOptions={["40AGL", "50HMG"]}
                 onUserEdit={() => {
                   if (cmtDetailListGenerated) { setCabinConfigChanged(true); setIsSynced(false); }
                 }}
@@ -709,7 +735,7 @@ export function BookingDetail() {
 
       {/* Sync confirm popup */}
       {showSyncConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/40 z-[1200] flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-xl w-[440px] p-6">
             <div className="flex items-center gap-4 mb-5">
               <div className="w-12 h-12 rounded-full bg-amber-100 flex items-center justify-center flex-shrink-0">
@@ -752,7 +778,7 @@ export function BookingDetail() {
 
       {/* Sync approval popup */}
       {showSyncApproval && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center">
+        <div className="fixed inset-0 bg-black/40 z-[1200] flex items-center justify-center">
           <div className="bg-white rounded-2xl shadow-xl w-[440px] p-6">
             <div className="flex items-center gap-4 mb-5">
               <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center flex-shrink-0">
@@ -789,7 +815,7 @@ export function BookingDetail() {
       )}
 
       {showCoursewarePopup && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm">
+        <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-black/40 backdrop-blur-sm">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md mx-4 px-8 py-8 text-center relative">
             <Button
               onClick={() => setShowCoursewarePopup(false)}

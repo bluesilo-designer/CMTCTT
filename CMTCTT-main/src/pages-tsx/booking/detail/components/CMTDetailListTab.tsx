@@ -713,16 +713,18 @@ export function CMTDetailListTab({
 
       {showConfigure && (
         <CMTConfigureDetailList
-          initialCabins={
-            configuredCabins
-              ? configuredCabins.map(c => ({
-                  cabin:        c.cabin,
-                  platformType: c.platformType,
-                  callsign:     c.callsign,
-                  trainees:     c.trainees,
-                }))
-              : CABIN_GROUPS
-          }
+          initialBatches={(() => {
+            if (configuredCabins) {
+              // Re-group saved cabins by batchIdx
+              const groups: typeof CABIN_GROUPS[] = [];
+              configuredCabins.forEach(c => {
+                while (groups.length <= c.batchIdx) groups.push([]);
+                groups[c.batchIdx].push(c);
+              });
+              return groups;
+            }
+            return allBatches;
+          })()}
           onClose={() => setShowConfigure(false)}
           onSave={(saved) => {
             setConfiguredCabins(saved);
